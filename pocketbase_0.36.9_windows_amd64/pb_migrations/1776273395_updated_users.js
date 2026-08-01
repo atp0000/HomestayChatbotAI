@@ -1,0 +1,26 @@
+/// <reference path="../pb_data/types.d.ts" />
+migrate((app) => {
+  const collection = app.findCollectionByNameOrId("_pb_users_auth_")
+
+  // update collection data
+  unmarshal({
+    "authRule": "",
+    "deleteRule": "",
+    "listRule": "",
+    "updateRule": ""
+  }, collection)
+
+  return app.save(collection)
+}, (app) => {
+  const collection = app.findCollectionByNameOrId("_pb_users_auth_")
+
+  // update collection data
+  unmarshal({
+    "authRule": null,
+    "deleteRule": null,
+    "listRule": null,
+    "updateRule": null
+  }, collection)
+
+  return app.save(collection)
+})
