@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Be Vietnam Pro", sans-serif;
+  overflow-x: clip;
+  color: hsl(var(--foreground));
+}
+
+@layer base {
+  :root {
+    --background: 195 60% 99%;
+    --foreground: 200 40% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 40% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 200 40% 14%;
+    --primary: 195 85% 41%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 190 45% 94%;
+    --secondary-foreground: 200 40% 20%;
+    --muted: 190 30% 95%;
+    --muted-foreground: 200 12% 45%;
+    --accent: 32 96% 56%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 195 30% 88%;
+    --input: 195 30% 88%;
+    --ring: 195 85% 41%;
+    --radius: 0.9rem;
+  }
+}
+
+h1,h2,h3,.font-display { font-family: "Baloo 2", cursive; }
+
+.text-balance { text-wrap: balance; }
+
+@keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+.animate-floaty { animation: floaty 6s ease-in-out infinite; }
+
+@keyframes fadeup { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+.animate-fadeup { animation: fadeup .6s ease-out both; }
+
+.no-scrollbar::-webkit-scrollbar { display:none; }
+.no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-floaty, .animate-fadeup { animation: none; }
+}
