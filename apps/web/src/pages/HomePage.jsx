@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SiteLayout from "@/components/SiteLayout";
-import SearchBar from "@/components/SearchBar"; // 🟢 Đã thêm import SearchBar
+import SearchBar from "@/components/SearchBar";
 import { api, fmt } from "@/lib/store";
 import pb from "@/lib/pocketbaseClient";
 
@@ -65,6 +65,18 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Hàm tạo URL ảnh chuẩn PocketBase
+  const getImageUrl = (record) => {
+    const images = Array.isArray(record.images)
+      ? record.images
+      : record.images
+      ? [record.images]
+      : [];
+    if (!images.length)
+      return "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1000";
+    return pb.files.getUrl(record, images[0]);
+  };
+
   const amenities = [
     { i: Wifi, t: "Wifi" },
     { i: Tv, t: "Tivi" },
@@ -72,8 +84,12 @@ export default function HomePage() {
     { i: Flame, t: "Nóng lạnh" },
   ];
 
-  const nextImg = () => setCurrentImgIdx((prev) => (prev + 1) % ABOUT_IMAGES.length);
-  const prevImg = () => setCurrentImgIdx((prev) => (prev - 1 + ABOUT_IMAGES.length) % ABOUT_IMAGES.length);
+  const nextImg = () =>
+    setCurrentImgIdx((prev) => (prev + 1) % ABOUT_IMAGES.length);
+  const prevImg = () =>
+    setCurrentImgIdx(
+      (prev) => (prev - 1 + ABOUT_IMAGES.length) % ABOUT_IMAGES.length
+    );
 
   return (
     <SiteLayout>
@@ -99,7 +115,8 @@ export default function HomePage() {
             Núi Homestay
           </h1>
           <p className="mt-4 text-base md:text-lg text-gray-200 max-w-xl mx-auto leading-relaxed animate-fadeup">
-            Nghỉ dưỡng yên bình giữa thiên nhiên xanh mát, chỉ cách trung tâm cố đô 3,6km.
+            Nghỉ dưỡng yên bình giữa thiên nhiên xanh mát, chỉ cách trung tâm cố
+            đô 3,6km.
           </p>
         </div>
 
@@ -140,10 +157,7 @@ export default function HomePage() {
           {rooms.map((r) => {
             const typeInfo = r.expand?.room_type_id || r.expand?.room_type;
             const roomPrice = typeInfo?.price ?? r.price ?? 0;
-            const roomImage =
-              r.images && r.images.length > 0
-                ? r.images[0]
-                : "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1000";
+            const roomImage = getImageUrl(r);
 
             return (
               <Card
@@ -151,12 +165,17 @@ export default function HomePage() {
                 className="group overflow-hidden border-border/60 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
               >
                 <div>
-                  <div className="relative h-56 overflow-hidden">
-                    <div
-                      className="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-500"
-                      style={{ backgroundImage: `url(${roomImage})` }}
+                  {/* 🟢 SỬA THÀNH THẺ <img> CÓ RỘNG/CAO CỐ ĐỊNH TỈ LỆ */}
+                  <div className="relative h-56 overflow-hidden bg-muted">
+                    <img
+                      src={roomImage}
+                      alt={typeInfo?.name || r.code}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <Badge className="absolute top-3 right-3 font-mono" variant="secondary">
+                    <Badge
+                      className="absolute top-3 right-3 font-mono shadow-md"
+                      variant="secondary"
+                    >
                       #{r.code}
                     </Badge>
                   </div>
@@ -176,7 +195,9 @@ export default function HomePage() {
                     <span className="text-2xl font-extrabold text-primary">
                       {fmt(roomPrice)}
                     </span>
-                    <span className="text-xs text-muted-foreground font-normal">/ đêm</span>
+                    <span className="text-xs text-muted-foreground font-normal">
+                      / đêm
+                    </span>
                   </div>
 
                   <Button
@@ -224,11 +245,10 @@ export default function HomePage() {
         className="max-w-7xl mx-auto px-4 sm:px-6 py-16 grid md:grid-cols-2 gap-10 items-center"
       >
         <div className="relative group h-80 rounded-2xl overflow-hidden shadow-lg border border-border/40">
-          <div
-            className="w-full h-full bg-cover bg-center transition-all duration-700 ease-in-out"
-            style={{
-              backgroundImage: `url(${ABOUT_IMAGES[currentImgIdx]})`,
-            }}
+          <img
+            src={ABOUT_IMAGES[currentImgIdx]}
+            alt="Về chúng tôi"
+            className="w-full h-full object-cover transition-all duration-700 ease-in-out"
           />
 
           <Button
@@ -270,9 +290,10 @@ export default function HomePage() {
             Về chúng tôi
           </h2>
           <p className="text-muted-foreground leading-relaxed text-sm md:text-base">
-            Núi Homestay là điểm dừng chân lý tưởng cho những ai yêu thích sự yên tĩnh và gần gũi
-            thiên nhiên. Với hệ thống phòng đầy đủ tiện nghi, dịch vụ chu đáo và vị trí thuận tiện,
-            chúng tôi cam kết mang đến cho bạn kỳ nghỉ trọn vẹn tại Huế.
+            Núi Homestay là điểm dừng chân lý tưởng cho những ai yêu thích sự
+            yên tĩnh và gần gũi thiên nhiên. Với hệ thống phòng đầy đủ tiện
+            nghi, dịch vụ chu đáo và vị trí thuận tiện, chúng tôi cam kết mang
+            đến cho bạn kỳ nghỉ trọn vẹn tại Huế.
           </p>
           <div className="flex items-center gap-2 text-primary font-medium text-sm pt-2">
             <MapPin className="w-5 h-5 shrink-0" />
@@ -287,12 +308,18 @@ export default function HomePage() {
           <div className="grid md:grid-cols-3">
             <div className="bg-primary/5 p-8 flex flex-col justify-center space-y-4 md:col-span-1">
               <div>
-                <Badge variant="outline" className="text-primary border-primary/30 mb-2">
+                <Badge
+                  variant="outline"
+                  className="text-primary border-primary/30 mb-2"
+                >
                   Liên hệ
                 </Badge>
-                <h2 className="font-display text-2xl font-extrabold">Núi Homestay</h2>
+                <h2 className="font-display text-2xl font-extrabold">
+                  Núi Homestay
+                </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Hãy liên hệ với chúng tôi nếu bạn cần tư vấn hoặc hỗ trợ đặt phòng.
+                  Hãy liên hệ với chúng tôi nếu bạn cần tư vấn hoặc hỗ trợ đặt
+                  phòng.
                 </p>
               </div>
 

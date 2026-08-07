@@ -5,9 +5,9 @@ import { AuthProvider } from '@/lib/AuthContext';
 import HomePage from './pages/HomePage';
 import RoomsPage from './pages/RoomsPage';
 import RoomDetailPage from './pages/RoomDetailPage';
-// import SuccessPage from './pages/SuccessPage';
-// import BookingPage from './pages/BookingPage';
-// import HistoryPage from './pages/HistoryPage';
+import SuccessPage from './pages/SuccessPage';
+import BookingPage from './pages/BookingPage';
+import HistoryPage from './pages/HistoryPage';
 import AuthPage from './pages/AuthPage';
 
 
@@ -22,10 +22,10 @@ function App() {
           <Route path="/rooms/:id" element={<RoomDetailPage />} /> 
           <Route path="/gioi-thieu" element={<HomePage />} />
           <Route path="/lien-he" element={<HomePage />} />
-          {/* <Route path="/booking" element={<BookingPage />} />
+          <Route path="/booking" element={<BookingPage />} />
            <Route path="/success/:id" element={<SuccessPage />} />
            <Route path="/lich-su" element={<HistoryPage />} /> 
-          */}
+         
           <Route path="/auth" element={<AuthPage />} />
         </Routes>
       </Router>
