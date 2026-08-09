@@ -20,8 +20,10 @@ export default function TransferPaymentModal({ bookingData, onError }) {
       try {
         setLoading(true);
 
+        // Tạo orderCode ngẫu nhiên dạng số nguyên cho PayOS
         const numericOrderCode = Number(String(Date.now()).slice(-6));
 
+        // 1. Tạo bản ghi Booking trong PocketBase
         const rec = await pb.collection("bookings").create({
           ...bookingData,
           payMethod: "transfer",
@@ -33,6 +35,7 @@ export default function TransferPaymentModal({ bookingData, onError }) {
         if (!isMounted) return;
         setCreatedBooking(rec);
 
+        // 2. Gọi backend PocketBase để đăng ký đơn hàng sang PayOS
         const res = await pb.send("/api/create-payos-payment", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -68,6 +71,7 @@ export default function TransferPaymentModal({ bookingData, onError }) {
     };
   }, []);
 
+  // 3. Đăng ký Realtime PocketBase (Chờ Webhook cập nhật status thành 'paid')
   useEffect(() => {
     if (!createdBooking?.id) return;
 
@@ -107,14 +111,13 @@ export default function TransferPaymentModal({ bookingData, onError }) {
       </div>
 
       <div className="flex flex-col items-center justify-center">
-        <div className="p-3 bg-white rounded-xl shadow-md border border-blue-100 min-h-[200px] flex items-center justify-center">
-          {payOsData.qrCode ? (
-            <QrImage value={payOsData.qrCode} size={240} />
-          ) : (
-            <p className="text-sm text-red-500">Không hiển thị được mã QR PayOS</p>
-          )}
-        </div>
-
+     <div className="p-3 bg-white rounded-xl shadow-md border border-blue-100 min-h-[200px] flex items-center justify-center">
+  {payOsData.qrCode ? (
+    <QrImage value={payOsData.qrCode} size={240} />
+  ) : (
+    <p className="text-sm text-red-500">Không hiển thị được mã QR PayOS</p>
+  )}
+</div>
         <div className="mt-4 text-sm space-y-1.5 bg-blue-50/80 p-3 rounded-lg w-full max-w-sm">
           <p className="text-muted-foreground flex items-center justify-center">
             Mã đơn hàng: <strong className="text-foreground ml-1">{createdBooking?.orderCode || createdBooking?.code}</strong>
@@ -128,7 +131,7 @@ export default function TransferPaymentModal({ bookingData, onError }) {
         </div>
       </div>
 
-      {payOsData.checkoutUrl && (
+     {payOsData.checkoutUrl && (
         <div className="pt-1">
           <a href={payOsData.checkoutUrl} target="_blank" rel="noopener noreferrer">
             <Button variant="outline" className="border-blue-500 text-blue-600 hover:bg-blue-50">

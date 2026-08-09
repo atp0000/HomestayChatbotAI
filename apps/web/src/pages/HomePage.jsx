@@ -74,7 +74,7 @@ export default function HomePage() {
       : [];
     if (!images.length)
       return "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1000";
-    return pb.files.getUrl(record, images[0]);
+    return pb.files.getURL(record, images[0]);
   };
 
   const amenities = [
