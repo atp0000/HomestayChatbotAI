@@ -7,8 +7,8 @@ import { api, genCode, nights } from "@/lib/store";
 // Components con của trang Lễ tân
 import StatusLegend from "@/components/reception/StatusLegend";
 import ReceptionGridView from "@/components/reception/ReceptionGridView";
-//import ReceptionTimelineView from "@/components/reception/ReceptionTimelineView";
-//import BookingDetailDialog from "@/components/reception/BookingDetailDialog";
+import ReceptionTimelineView from "@/components/reception/ReceptionTimelineView";
+import BookingDetailDialog from "@/components/reception/BookingDetailDialog";
 import WalkInBookingModal from "@/components/reception/WalkInBookingModal";
 
 // shadcn/ui & Icons
@@ -43,13 +43,32 @@ export default function ReceptionPage() {
     payMethod: "cash",
   });
 
-  const load = () => {
-    api.rooms().then(setRooms).catch(() => {});
-    api.bookings().then(setBookings).catch(() => {});
+  // 🟢 Lấy danh sách rooms và bookings hỗ trợ Expand Relation
+  const load = async () => {
+    try {
+      const [roomsData, bookingsData] = await Promise.all([
+        pb.collection("rooms").getFullList({ expand: "room_type_id,room_type,roomType" }),
+        pb.collection("bookings").getFullList({ expand: "roomCode,room_type_id" }),
+      ]);
+      setRooms(roomsData);
+      setBookings(bookingsData);
+    } catch (err) {
+      // Fallback về helper cũ nếu lỗi
+      api.rooms().then(setRooms).catch(() => {});
+      api.bookings().then(setBookings).catch(() => {});
+    }
   };
 
   useEffect(() => {
     load();
+
+    const unsubscribe = pb.collection("bookings").subscribe("*", () => {
+      load();
+    });
+
+    return () => {
+      pb.collection("bookings").unsubscribe("*");
+    };
   }, []);
 
   const handleLogout = () => {
@@ -61,13 +80,24 @@ export default function ReceptionPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // 🟢 Hàm kiểm tra trạng thái phòng tương thích với Relation (ID / Object / Code)
   const roomState = (code) => {
-    const activeBookings = bookings.filter(
-      (b) =>
-        b.roomCode === code &&
-        b.status !== "cancelled" &&
-        b.status !== "checkedout"
-    );
+    const room = rooms.find((r) => r.code === code || r.id === code);
+    const roomId = room?.id;
+    const roomCode = room?.code || code;
+
+    const activeBookings = bookings.filter((b) => {
+      const bRoomId = b.expand?.roomCode?.id || b.roomCode;
+      const bRoomCode = b.expand?.roomCode?.code || b.roomCode;
+
+      const isSameRoom =
+        bRoomId === roomId ||
+        bRoomCode === roomCode ||
+        b.roomCode === roomCode ||
+        b.roomCode === roomId;
+
+      return isSameRoom && b.status !== "cancelled" && b.status !== "checkedout";
+    });
 
     const stayingBooking = activeBookings.find((b) => b.status === "checkedin");
     if (stayingBooking) return { s: "staying", b: stayingBooking };
@@ -80,13 +110,25 @@ export default function ReceptionPage() {
     return { s: "empty", b: null };
   };
 
-  const roomBookings = (code) =>
-    bookings.filter(
-      (b) =>
-        b.roomCode === code &&
-        b.status !== "cancelled" &&
-        b.status !== "checkedout"
-    );
+  // 🟢 Lấy danh sách đơn đặt của từng phòng tương thích Relation
+  const roomBookings = (code) => {
+    const room = rooms.find((r) => r.code === code || r.id === code);
+    const roomId = room?.id;
+    const roomCode = room?.code || code;
+
+    return bookings.filter((b) => {
+      const bRoomId = b.expand?.roomCode?.id || b.roomCode;
+      const bRoomCode = b.expand?.roomCode?.code || b.roomCode;
+
+      const isSameRoom =
+        bRoomId === roomId ||
+        bRoomCode === roomCode ||
+        b.roomCode === roomCode ||
+        b.roomCode === roomId;
+
+      return isSameRoom && b.status !== "cancelled" && b.status !== "checkedout";
+    });
+  };
 
   const updateStatus = async (b, newStatus) => {
     try {
@@ -160,6 +202,7 @@ export default function ReceptionPage() {
     return null;
   };
 
+  // 🟢 Lưu phòng dạng Relation (Truyền ID phòng)
   const handleCreateWalkInBooking = async (e) => {
     e.preventDefault();
     setFormErr("");
@@ -172,19 +215,22 @@ export default function ReceptionPage() {
 
     setSaving(true);
     try {
-      const room = rooms.find((r) => r.code === formData.roomCode);
+      const room = rooms.find(
+        (r) => r.code === formData.roomCode || r.id === formData.roomCode
+      );
       if (!room) throw new Error("Không tìm thấy thông tin phòng đã chọn.");
 
-      const roomPrice = room.expand?.room_type_id?.price ?? room.price ?? 0;
-      const roomTypeName =
-        room.expand?.room_type_id?.name ?? room.typeName ?? "Phòng Homestay";
+      const roomTypeObj =
+        room.expand?.room_type_id || room.expand?.room_type || room.expand?.roomType;
+      const roomPrice = roomTypeObj?.price ?? room.price ?? 0;
+      const roomTypeName = roomTypeObj?.name ?? room.typeName ?? "Phòng Homestay";
 
       const n = nights(formData.checkIn, formData.checkOut);
       const total = roomPrice * n;
 
       const recordData = {
         code: genCode(),
-        roomCode: formData.roomCode,
+        roomCode: room.id, // 🟢 Lưu ID của phòng vào relation field roomCode
         roomTypeName: roomTypeName,
         guestName: formData.guestName,
         guestPhone: formData.guestPhone,
@@ -216,9 +262,14 @@ export default function ReceptionPage() {
     }
   };
 
-  const selectedRoom = rooms.find((r) => r.code === formData.roomCode);
-  const currentRoomPrice =
-    selectedRoom?.expand?.room_type_id?.price ?? selectedRoom?.price ?? 0;
+  const selectedRoom = rooms.find(
+    (r) => r.code === formData.roomCode || r.id === formData.roomCode
+  );
+  const roomTypeObj =
+    selectedRoom?.expand?.room_type_id ||
+    selectedRoom?.expand?.room_type ||
+    selectedRoom?.expand?.roomType;
+  const currentRoomPrice = roomTypeObj?.price ?? selectedRoom?.price ?? 0;
   const calcNights = nights(formData.checkIn, formData.checkOut);
   const calcTotal = currentRoomPrice * Math.max(0, calcNights);
 
@@ -228,7 +279,7 @@ export default function ReceptionPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* HEADER RIÊNG CHO LỄ TÂN (ĐÃ PHỤC HỒI NGUYÊN BẢN VÀ ĐẸP MẮT) */}
+      {/* HEADER RIÊNG CHO LỄ TÂN */}
       <header className="bg-primary text-primary-foreground px-5 h-14 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2 font-extrabold text-lg">
           <Palmtree className="w-5 h-5 text-amber-400" />
@@ -246,32 +297,33 @@ export default function ReceptionPage() {
           <div className="h-6 w-[1px] bg-primary-foreground/20 mx-1"></div>
 
           {/* Nút Xem dạng Lưới (Grid) */}
-<Button
-  variant="ghost"
-  size="icon"
-  onClick={() => setView("grid")}
-  className={`h-9 w-9 transition-all ${
-    view === "grid"
-      ? "bg-white/25 text-white font-bold shadow-sm"
-      : "text-white/80 hover:bg-white/15 hover:text-white"
-  }`}
->
-  <LayoutGrid className="w-5 h-5" />
-</Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setView("grid")}
+            className={`h-9 w-9 transition-all ${
+              view === "grid"
+                ? "bg-white/25 text-white font-bold shadow-sm"
+                : "text-white/80 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            <LayoutGrid className="w-5 h-5" />
+          </Button>
 
-{/* Nút Xem dạng Danh sách/Thời gian (Timeline) */}
-<Button
-  variant="ghost"
-  size="icon"
-  onClick={() => setView("timeline")}
-  className={`h-9 w-9 transition-all ${
-    view === "timeline"
-      ? "bg-white/25 text-white font-bold shadow-sm"
-      : "text-white/80 hover:bg-white/15 hover:text-white"
-  }`}
->
-  <List className="w-5 h-5" />
-</Button>
+          {/* Nút Xem dạng Danh sách/Thời gian (Timeline) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setView("timeline")}
+            className={`h-9 w-9 transition-all ${
+              view === "timeline"
+                ? "bg-white/25 text-white font-bold shadow-sm"
+                : "text-white/80 hover:bg-white/15 hover:text-white"
+            }`}
+          >
+            <List className="w-5 h-5" />
+          </Button>
+
           <Button
             variant="ghost"
             size="sm"

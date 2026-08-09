@@ -24,8 +24,12 @@ export default function ReceptionGridView({
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {rooms.map((r) => {
         const st = roomState(r.code);
-        const price = r.expand?.room_type_id?.price ?? r.price ?? 0;
-        const typeName = r.expand?.room_type_id?.name ?? r.typeName;
+
+        // 🟢 Lấy dữ liệu Relation Loại phòng linh hoạt
+        const roomType =
+          r.expand?.room_type_id || r.expand?.room_type || r.expand?.roomType;
+        const price = roomType?.price ?? r.price ?? 0;
+        const typeName = roomType?.name ?? r.typeName ?? "Phòng Homestay";
 
         return (
           <Card
