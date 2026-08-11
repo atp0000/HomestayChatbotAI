@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,12 +21,14 @@ import { fmt, fmtVND } from "@/lib/store";
 import DateRangePicker from "@/components/DateRangePicker";
 import BookingAvailabilityAlert from "@/components/BookingAvailabilityAlert";
 
-
+/**
+ * MODAL ĐẶT PHÒNG CHO KHÁCH TRỰC TIẾP (WALK-IN)
+ */
 export default function WalkInBookingModal({
   open,
   onOpenChange,
-  rooms,
-  bookings,
+  rooms = [],
+  bookings = [],
   formData,
   setFormData,
   isRoomLocked,
@@ -38,6 +40,43 @@ export default function WalkInBookingModal({
   calcNights,
   calcTotal,
 }) {
+  // 1. Tìm thông tin phòng đang được chọn
+  const selectedRoom = rooms.find(
+    (r) => r.id === formData.roomCode || r.code === formData.roomCode
+  );
+
+  // 2. Lấy sức chứa tối đa của phòng đang chọn
+  const maxCapacity = selectedRoom?.capacity || 1;
+
+  // 3. Xử lý giới hạn số khách
+  const handleGuestsChange = (e) => {
+    let val = parseInt(e.target.value, 10);
+
+    if (isNaN(val) || val < 1) {
+      val = 1;
+    } else if (val > maxCapacity) {
+      val = maxCapacity;
+    }
+
+    setFormData((prev) => ({ ...prev, guests: val }));
+  };
+
+  // 4. Xử lý khi chọn hình thức thanh toán (Chuyển khoản -> Mặc định đã thanh toán)
+  const handlePayMethodChange = (val) => {
+    setFormData((prev) => ({
+      ...prev,
+      payMethod: val,
+      payStatus: val === "transfer" ? "paid" : prev.payStatus,
+    }));
+  };
+
+  // 5. Tự động điều chỉnh số khách nếu người dùng chọn phòng khác có sức chứa nhỏ hơn
+  useEffect(() => {
+    if (formData.guests > maxCapacity) {
+      setFormData((prev) => ({ ...prev, guests: maxCapacity }));
+    }
+  }, [formData.roomCode, maxCapacity]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-6 gap-0">
@@ -90,11 +129,21 @@ export default function WalkInBookingModal({
                   </SelectTrigger>
                   <SelectContent>
                     {rooms.map((r) => {
-                      const p = r.expand?.room_type_id?.price ?? r.price ?? 0;
+                      const roomType =
+                        r.expand?.room_type_id ||
+                        r.expand?.room_type ||
+                        r.expand?.roomType;
+                      const p = roomType?.price ?? r.price ?? 0;
+                      const typeName =
+                        roomType?.name ?? r.typeName ?? "Phòng";
+
                       return (
-                        <SelectItem key={r.id} value={r.code} className="text-xs">
-                          Phòng {r.code} ({r.expand?.room_type_id?.name ?? r.typeName}) -{" "}
-                          {fmt(p)}đ
+                        <SelectItem
+                          key={r.id}
+                          value={r.id}
+                          className="text-xs"
+                        >
+                          Phòng {r.code} ({typeName}) - {fmt(p)}đ
                         </SelectItem>
                       );
                     })}
@@ -102,31 +151,9 @@ export default function WalkInBookingModal({
                 </Select>
               </div>
 
-              {/* Quy trình */}
-              <div className="col-span-6 space-y-1">
-                <Label className="text-xs">Trạng thái nhận phòng *</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(val) =>
-                    setFormData({ ...formData, status: val })
-                  }
-                >
-                  <SelectTrigger className="h-9 text-xs font-medium">
-                    <SelectValue placeholder="Chọn quy trình" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="checkedin" className="text-xs">
-                      🟡 Nhận phòng ngay (Đang ở)
-                    </SelectItem>
-                    <SelectItem value="pending" className="text-xs">
-                      🔴 Đặt trước (Sắp đến)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
 
               {/* Tái sử dụng DateRangePicker cho Chọn Ngày */}
-              <div className="col-span-10">
+              <div className="col-span-9">
                 <DateRangePicker
                   checkIn={formData.checkIn}
                   checkOut={formData.checkOut}
@@ -134,16 +161,20 @@ export default function WalkInBookingModal({
                 />
               </div>
 
-              <div className="col-span-2 space-y-1">
-                <Label className="text-xs font-semibold">Số khách</Label>
+              {/* Ô Nhập Số Khách */}
+              <div className="col-span-3 space-y-1">
+                <Label className="text-xs font-semibold flex justify-between items-center">
+                  <span>Số khách</span>
+                  <span className="text-[10px] text-muted-foreground font-normal">
+                    (Max: {maxCapacity})
+                  </span>
+                </Label>
                 <Input
                   type="number"
                   min="1"
-                  max="10"
+                  max={maxCapacity}
                   value={formData.guests}
-                  onChange={(e) =>
-                    setFormData({ ...formData, guests: e.target.value })
-                  }
+                  onChange={handleGuestsChange}
                   className="h-9 text-xs text-center font-medium bg-background"
                 />
               </div>
@@ -187,7 +218,7 @@ export default function WalkInBookingModal({
               </div>
 
               <div className="col-span-6 space-y-1">
-                <Label className="text-xs">Email (Tùy chọn)</Label>
+                <Label className="text-xs">Email</Label>
                 <Input
                   type="email"
                   placeholder="khach@gmail.com"
@@ -200,7 +231,7 @@ export default function WalkInBookingModal({
               </div>
 
               <div className="col-span-6 space-y-1">
-                <Label className="text-xs">Địa chỉ (Tùy chọn)</Label>
+                <Label className="text-xs">Địa chỉ</Label>
                 <Input
                   type="text"
                   placeholder="Hà Nội, Huế..."
@@ -244,13 +275,12 @@ export default function WalkInBookingModal({
 
             <div className="col-span-7 space-y-2">
               <div className="grid grid-cols-2 gap-2">
+                {/* Hình thức thanh toán */}
                 <div className="space-y-1">
                   <Label className="text-xs">Hình thức</Label>
                   <Select
                     value={formData.payMethod}
-                    onValueChange={(val) =>
-                      setFormData({ ...formData, payMethod: val })
-                    }
+                    onValueChange={handlePayMethodChange}
                   >
                     <SelectTrigger className="h-8 text-xs">
                       <SelectValue />
@@ -266,6 +296,7 @@ export default function WalkInBookingModal({
                   </Select>
                 </div>
 
+                {/* Trạng thái thanh toán (Đã bỏ tùy chọn 'Đã cọc') */}
                 <div className="space-y-1">
                   <Label className="text-xs">Thanh toán</Label>
                   <Select
@@ -282,10 +313,7 @@ export default function WalkInBookingModal({
                         Chưa thanh toán
                       </SelectItem>
                       <SelectItem value="paid" className="text-xs">
-                        Đã thanh toán đủ
-                      </SelectItem>
-                      <SelectItem value="deposit" className="text-xs">
-                        Đã cọc
+                        Đã thanh toán
                       </SelectItem>
                     </SelectContent>
                   </Select>

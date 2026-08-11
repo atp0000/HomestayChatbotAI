@@ -10,8 +10,31 @@ import {
 import { CheckCircle, LogOut as LogOutIcon, XCircle } from "lucide-react";
 import { fmtVND, fmtDate } from "@/lib/store";
 
-
+/**
+ * POPUP CHI TIẾT ĐẶT PHÒNG
+ *
+ * Props:
+ * - booking: booking đang chọn xem (null nếu đóng popup)
+ * - onClose(): đóng popup
+ * - onUpdateStatus(booking, newStatus): cập nhật trạng thái booking
+ */
 export default function BookingDetailDialog({ booking, onClose, onUpdateStatus }) {
+  // 🟢 Lấy thông tin phòng và loại phòng từ Relation Expand
+  const roomObj = booking?.expand?.roomCode;
+  const displayRoomCode = roomObj?.code || booking?.roomCode || "";
+  const payStatusLabel =
+    booking?.payStatus === "paid"
+      ? "Đã thanh toán"
+      : booking?.payStatus === "unpaid"
+      ? "Chưa thanh toán"
+      : booking?.payStatus || "Chưa thanh toán";
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkInDate = booking?.checkIn ? new Date(booking.checkIn) : null;
+  if (checkInDate) checkInDate.setHours(0, 0, 0, 0);
+  const canCheckIn = !!checkInDate && today >= checkInDate;
+
   return (
     <Dialog open={!!booking} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
@@ -35,7 +58,10 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus }
               Địa chỉ: <b>{booking.guestAddress || "Chưa cập nhật"}</b>
             </p>
             <p>
-              Phòng: <b>{booking.roomCode}</b> ({booking.roomTypeName})
+              Phòng: <b>{displayRoomCode}</b>
+            </p>
+            <p>
+              Trạng thái thanh toán: <b>{payStatusLabel}</b>
             </p>
             <p>
               Nhận → Trả:{" "}
@@ -63,7 +89,8 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus }
             <>
               <Button
                 onClick={() => onUpdateStatus(booking, "checkedin")}
-                className="flex-1 bg-amber-400 hover:bg-amber-500 text-black font-bold gap-1.5 shadow"
+                disabled={!canCheckIn}
+                className={`flex-1 ${canCheckIn ? "bg-amber-400 hover:bg-amber-500 text-black" : "bg-slate-300 text-slate-600 cursor-not-allowed"} font-bold gap-1.5 shadow`}
               >
                 <CheckCircle className="w-4 h-4" />
                 Nhận phòng
