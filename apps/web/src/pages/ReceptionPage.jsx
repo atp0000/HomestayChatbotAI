@@ -35,8 +35,8 @@ export default function ReceptionPage() {
     guestEmail: "",
     guestAddress: "",
     note: "",
-    checkIn: new Date().toISOString().split("T")[0],
-    checkOut: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+    checkIn: "",
+    checkOut: "",
     guests: 1,
     status: "checkedin",
     payStatus: "unpaid",
@@ -48,7 +48,8 @@ export default function ReceptionPage() {
     try {
       const [roomsData, bookingsData] = await Promise.all([
         pb.collection("rooms").getFullList({ expand: "room_type_id,room_type,roomType" }),
-        pb.collection("bookings").getFullList({ expand: "roomCode,room_type_id" }),
+        // Expand thêm roomTypeName để hiển thị đầy đủ thông tin khi query
+        pb.collection("bookings").getFullList({ expand: "roomCode,roomTypeName,room_type_id" }),
       ]);
       setRooms(roomsData);
       setBookings(bookingsData);
@@ -144,13 +145,20 @@ export default function ReceptionPage() {
     }
   };
 
+  let minDate = new Date(today);
   let maxDate = new Date(today);
   maxDate.setDate(maxDate.getDate() + 7);
 
   bookings.forEach((b) => {
-    if (b.status !== "cancelled" && b.status !== "checkedout" && b.checkOut) {
-      const parts = b.checkOut.split("T")[0].split("-").map(Number);
-      const outD = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
+    if (b.status !== "cancelled" && b.status !== "checkedout" && b.checkIn && b.checkOut) {
+      const checkInParts = b.checkIn.split("T")[0].split("-").map(Number);
+      const checkOutParts = b.checkOut.split("T")[0].split("-").map(Number);
+      const inD = new Date(checkInParts[0], checkInParts[1] - 1, checkInParts[2], 0, 0, 0, 0);
+      const outD = new Date(checkOutParts[0], checkOutParts[1] - 1, checkOutParts[2], 0, 0, 0, 0);
+
+      if (inD < minDate) {
+        minDate = inD;
+      }
       if (outD > maxDate) {
         maxDate = outD;
       }
@@ -159,18 +167,17 @@ export default function ReceptionPage() {
 
   const totalDaysToShow = Math.max(
     7,
-    Math.ceil((maxDate - today) / (1000 * 60 * 60 * 24)) + 1
+    Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1
   );
 
   const days = Array.from(
     { length: totalDaysToShow },
-    (_, i) => new Date(today.getTime() + i * 86400000)
+    (_, i) => new Date(minDate.getTime() + i * 86400000)
   );
 
   const handleOpenWalkIn = (fromRoomCode = "") => {
     setFormErr("");
-    const defaultRoom =
-      fromRoomCode || (rooms.length > 0 ? rooms[0].code : "");
+    const defaultRoom = fromRoomCode || "";
     const tomorrowStr = new Date(Date.now() + 86400000)
       .toISOString()
       .split("T")[0];
@@ -184,8 +191,8 @@ export default function ReceptionPage() {
       guestEmail: "",
       guestAddress: "",
       note: "",
-      checkIn: todayStr,
-      checkOut: tomorrowStr,
+      checkIn: "",
+      checkOut: "",
       guests: 1,
       status: "checkedin",
       payStatus: "unpaid",
@@ -195,14 +202,20 @@ export default function ReceptionPage() {
   };
 
   const validateBooking = () => {
-    const { guestName, guestPhone } = formData;
+    const { guestName, guestPhone, roomCode, checkIn, checkOut } = formData;
     if (!guestName.trim() || !guestPhone.trim()) {
       return "Vui lòng nhập đầy đủ Họ tên và Số điện thoại khách hàng.";
+    }
+    if (!roomCode) {
+      return "Vui lòng chọn phòng trước khi đặt.";
+    }
+    if (!checkIn || !checkOut) {
+      return "Vui lòng chọn ngày nhận và ngày trả.";
     }
     return null;
   };
 
-  // 🟢 Lưu phòng dạng Relation (Truyền ID phòng)
+  // 🟢 Lưu phòng & loại phòng dạng Relation (Truyền Record ID)
   const handleCreateWalkInBooking = async (e) => {
     e.preventDefault();
     setFormErr("");
@@ -220,18 +233,26 @@ export default function ReceptionPage() {
       );
       if (!room) throw new Error("Không tìm thấy thông tin phòng đã chọn.");
 
+      // Lấy Object loại phòng tương ứng
       const roomTypeObj =
         room.expand?.room_type_id || room.expand?.room_type || room.expand?.roomType;
+      
       const roomPrice = roomTypeObj?.price ?? room.price ?? 0;
-      const roomTypeName = roomTypeObj?.name ?? room.typeName ?? "Phòng Homestay";
+
+      // 🟢 LẤY ĐÚNG ID CỦA RECORD LOẠI PHÒNG (Relation ID)
+      const roomTypeId = roomTypeObj?.id || room.room_type_id || room.roomType;
 
       const n = nights(formData.checkIn, formData.checkOut);
       const total = roomPrice * n;
 
+      const checkInDate = new Date(formData.checkIn);
+      checkInDate.setHours(0, 0, 0, 0);
+      const effectiveStatus = checkInDate <= today ? "checkedin" : "pending";
+
       const recordData = {
         code: genCode(),
-        roomCode: room.id, // 🟢 Lưu ID của phòng vào relation field roomCode
-        roomTypeName: roomTypeName,
+        roomCode: room.id,          // Lưu Record ID của phòng (Relation)
+        roomTypeName: roomTypeId,   // 🟢 ĐÃ SỬA: Lưu Record ID của loại phòng (Relation)
         guestName: formData.guestName,
         guestPhone: formData.guestPhone,
         guestEmail:
@@ -248,7 +269,7 @@ export default function ReceptionPage() {
         total: total,
         payMethod: formData.payMethod,
         payStatus: formData.payStatus,
-        status: formData.status,
+        status: effectiveStatus,
       };
 
       await pb.collection("bookings").create(recordData);
