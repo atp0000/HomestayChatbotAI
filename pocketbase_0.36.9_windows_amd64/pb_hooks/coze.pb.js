@@ -1,124 +1,148 @@
-/// <reference path="../pb_data/types.d.ts" />
+// pb_hooks/coze.pb.js
 
-// =====================================================================
-// Custom route: POST /api/coze-chat
-// Proxy giữa frontend React và Coze Chat API (v3/chat).
-// Token PAT được giữ ở đây (server), KHÔNG BAO GIỜ gửi về frontend.
-// =====================================================================
-
-// TODO: cách an toàn nhất là đặt token qua biến môi trường khi chạy PocketBase,
-// ví dụ: COZE_PAT_TOKEN=pat_xxx ./pocketbase serve
-// rồi đọc bằng $os.getenv("COZE_PAT_TOKEN").
-// Nếu PocketBase bản bạn dùng chưa hỗ trợ $os.getenv, có thể tạm hardcode thẳng
-// ở đây (file này chỉ nằm trên server, không bao giờ gửi ra browser) —
-// chỉ cần nhớ KHÔNG commit file này lên repo public / thêm vào .gitignore.
-routerAdd("POST", "/api/coze-chat", (e) => {
-  // QUAN TRỌNG: các hằng số này phải khai báo BÊN TRONG handler,
-  // vì JSVM chạy handler ở 1 VM instance riêng, không đọc được biến
-  // khai báo ở ngoài top-level của file (xem JSVM "Caveats and limitations").
-  const COZE_PAT_TOKEN = $os.getenv("COZE_PAT_TOKEN") || "pat_8icSm2m1t4DTlfATUu4sKavj0So7rGuezfJgJyhmIAashMTq0TjPqW8jjLQxUX5v";
-  const COZE_BOT_ID = "7670933824876085253";
-  const COZE_BASE_URL = "https://api.coze.com"; // đổi thành api.coze.cn nếu dùng bản Trung Quốc
-
-  const data = new DynamicModel({
-    message: "",
-    conversation_id: "",
-  });
-  e.bindBody(data);
-
-  if (!data.message || data.message.trim() === "") {
-    return e.json(400, { error: "Thiếu nội dung tin nhắn (message)." });
+// Hàm sleep đồng bộ (busy-wait) vì JSVM của PocketBase không có hàm sleep sẵn
+function sleep(ms) {
+  const start = Date.now();
+  while (Date.now() - start < ms) {
+    // chặn có chủ đích để chờ
   }
+}
 
+routerAdd("POST", "/api/coze/chat", (e) => {
   try {
-    // 1. Tạo chat (gửi tin nhắn)
-    const createBody = {
-      bot_id: COZE_BOT_ID,
-      user_id: "web_guest", // có thể thay bằng id thật nếu người dùng đã đăng nhập
-      stream: false,
-      auto_save_history: true,
-      additional_messages: [
-        {
-          role: "user",
-          content: data.message,
-          content_type: "text",
-        },
-      ],
-    };
+    // ==== CẤU HÌNH ====
+    const COZE_BOT_ID = "7670933824876085253";
+    const COZE_API_TOKEN = "pat_ymPCXHtjs57UiGQW3sVhI07jkLtUfoaCQUDXehBtVP6OgFhtAhOjXmhW9qgXKnGA";
+    const COZE_API_BASE = "https://api.coze.com"; // đổi thành .cn nếu token tạo bên coze.cn
+    // ===================
 
-    let url = COZE_BASE_URL + "/v3/chat";
-    if (data.conversation_id) {
-      url += "?conversation_id=" + encodeURIComponent(data.conversation_id);
+    const info = e.requestInfo();
+    const data = info.body || {};
+    const { message, conversationId, userId } = data;
+
+    if (!message || !userId) {
+      return e.json(400, { error: "Thiếu message hoặc userId" });
     }
 
+    // ---- Tạo chat ----
     const createRes = $http.send({
-      url: url,
+      url: `${COZE_API_BASE}/v3/chat`,
       method: "POST",
-      body: JSON.stringify(createBody),
       headers: {
+        Authorization: `Bearer ${COZE_API_TOKEN}`,
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + COZE_PAT_TOKEN,
       },
+      body: JSON.stringify({
+        bot_id: COZE_BOT_ID,
+        user_id: userId,
+        stream: false,
+        auto_save_history: true,
+        conversation_id: conversationId || undefined,
+        additional_messages: [
+          { role: "user", content: message, content_type: "text" },
+        ],
+      }),
     });
 
-    if (createRes.statusCode >= 400 || !createRes.json || !createRes.json.data) {
-      // Debug tạm thời: trả nguyên văn response của Coze để xem chính xác lỗi gì
-      return e.json(502, {
-        error: "Coze API không trả về dữ liệu hợp lệ",
-        statusCode: createRes.statusCode,
-        raw: createRes.raw,
-      });
+    let createBody;
+    try {
+      createBody = JSON.parse(createRes.raw);
+    } catch (parseErr) {
+      throw new Error(
+        `Không parse được response tạo chat (HTTP ${createRes.statusCode}): ${createRes.raw}`
+      );
     }
 
-    const chatId = createRes.json.data.id;
-    const conversationId = createRes.json.data.conversation_id;
+    if (createBody.code && createBody.code !== 0) {
+      throw new Error(
+        `Coze báo lỗi khi tạo chat -> code: ${createBody.code}, msg: ${createBody.msg}`
+      );
+    }
 
-    // 2. Poll trạng thái cho tới khi completed (tối đa ~15s)
-    let status = createRes.json.data.status;
+    const chat = createBody.data;
+    if (!chat) {
+      throw new Error("Coze trả về không có 'data' khi tạo chat: " + createRes.raw);
+    }
+
+    const newConversationId = chat.conversation_id;
+    const chatId = chat.id;
+
+    // ---- Poll trạng thái (có nghỉ thật giữa các lần) ----
+    let status = chat.status;
     let tries = 0;
-    while (status !== "completed" && tries < 30) {
-      sleep(500);
+    const maxTries = 20;
+    const statusLog = [status];
+
+    while (status !== "completed" && tries < maxTries) {
+      sleep(1500); // nghỉ 1.5s thật sự trước khi hỏi lại
+
       const pollRes = $http.send({
-        url:
-          COZE_BASE_URL +
-          "/v3/chat/retrieve?conversation_id=" +
-          encodeURIComponent(conversationId) +
-          "&chat_id=" +
-          encodeURIComponent(chatId),
+        url: `${COZE_API_BASE}/v3/chat/retrieve?chat_id=${chatId}&conversation_id=${newConversationId}`,
         method: "GET",
-        headers: { "Authorization": "Bearer " + COZE_PAT_TOKEN },
+        headers: { Authorization: `Bearer ${COZE_API_TOKEN}` },
       });
-      status = pollRes.json.data.status;
+
+      let pollBody;
+      try {
+        pollBody = JSON.parse(pollRes.raw);
+      } catch (e2) {
+        throw new Error(`Không parse được response poll: ${pollRes.raw}`);
+      }
+
+      if (pollBody.code && pollBody.code !== 0) {
+        throw new Error(`Coze báo lỗi khi poll -> code: ${pollBody.code}, msg: ${pollBody.msg}`);
+      }
+
+      const pollData = pollBody.data;
+      status = pollData?.status;
+      statusLog.push(status);
+
       if (status === "failed" || status === "requires_action") {
-        return e.json(502, { error: "Chat không hoàn tất", status: status });
+        throw new Error(
+          "Bot xử lý thất bại, status: " + status + " chi tiết: " + pollRes.raw
+        );
       }
       tries++;
     }
 
     if (status !== "completed") {
-      return e.json(504, { error: "Bot phản hồi quá lâu, vui lòng thử lại." });
+      throw new Error(
+        "Bot xử lý quá lâu, chưa hoàn thành sau " +
+          tries +
+          " lần thử. Lịch sử status: " +
+          JSON.stringify(statusLog)
+      );
     }
 
-    // 3. Lấy danh sách message, tìm message loại "answer"
+    // ---- Lấy danh sách tin nhắn trả lời ----
     const msgRes = $http.send({
-      url:
-        COZE_BASE_URL +
-        "/v3/chat/message/list?conversation_id=" +
-        encodeURIComponent(conversationId) +
-        "&chat_id=" +
-        encodeURIComponent(chatId),
+      url: `${COZE_API_BASE}/v3/chat/message/list?chat_id=${chatId}&conversation_id=${newConversationId}`,
       method: "GET",
-      headers: { "Authorization": "Bearer " + COZE_PAT_TOKEN },
+      headers: { Authorization: `Bearer ${COZE_API_TOKEN}` },
     });
 
-    const messages = msgRes.json.data || [];
-    const answer = messages.find((m) => m.type === "answer");
+    let msgBody;
+    try {
+      msgBody = JSON.parse(msgRes.raw);
+    } catch (e3) {
+      throw new Error(`Không parse được response message list: ${msgRes.raw}`);
+    }
+
+    if (msgBody.code && msgBody.code !== 0) {
+      throw new Error(`Coze báo lỗi khi lấy message -> code: ${msgBody.code}, msg: ${msgBody.msg}`);
+    }
+
+    const msgData = msgBody.data || [];
+    const answer = msgData
+      .filter((m) => m.type === "answer")
+      .map((m) => m.content)
+      .join("\n");
 
     return e.json(200, {
-      reply: answer ? answer.content : "(Không có phản hồi)",
-      conversation_id: conversationId,
+      answer: answer || "(Bot không trả lời)",
+      conversationId: newConversationId,
     });
   } catch (err) {
-    return e.json(500, { error: "Lỗi server khi gọi Coze", detail: String(err) });
+    return e.json(400, { debug_error: String(err), stack: err.stack || null });
   }
 });
