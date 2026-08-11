@@ -4,6 +4,8 @@ import SiteLayout from "@/components/SiteLayout";
 import SearchBar from "@/components/SearchBar";
 import { api, fmt } from "@/lib/store";
 import pb from "@/lib/pocketbaseClient";
+import { ABOUT_IMAGES } from "@/assets/aboutImages";
+import background from "@/assets/background.jpg";
 
 // Lucide Icons
 import {
@@ -28,14 +30,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
-// Danh sách ảnh trình chiếu ở phần "Về chúng tôi"
-const ABOUT_IMAGES = [
-  "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=1000",
-  "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1000",
-  "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1000",
-  "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1000",
-];
 
 export default function HomePage() {
   const nav = useNavigate();
@@ -98,9 +92,8 @@ export default function HomePage() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage:
-              "url(https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600)",
-          }}
+  backgroundImage: `url(${background})`,
+}}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
 
@@ -334,7 +327,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-start gap-3 text-muted-foreground">
                   <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <span>Thành phố Huế, Thừa Thiên Huế</span>
+                  <span> 2 Ngự Bình, An Cụ, Thành phố Huế</span>
                 </div>
               </div>
             </div>
@@ -342,13 +335,13 @@ export default function HomePage() {
             <div className="h-64 md:h-auto min-h-[250px] md:col-span-2 relative bg-muted">
               <iframe
                 title="Google Maps Nui Homestay"
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d61244.577234839815!2d107.5458021486328!3d16.453388200000005!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3141a13e2e2832c3%3A0x6271926c04f9828e!2zVGjDoG5oIHBo4buRIEh14bq_LCBUaOG7q2EgVGhpw6puIEh14bq_!5e0!3m2!1svi!2svn!4v1710000000000!5m2!1svi!2svn"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3826.438763543748!2d107.59792107460758!3d16.453306129042545!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3141a16a340ff1fb%3A0xb694d9c639f5f39f!2zMiBOZ-G7sSBCw6xuaCwgdOG7lSA2LCBBbiBD4buxdSwgSHXhur8sIFZp4buHdCBOYW0!5e0!3m2!1svi!2s!4v1786464347463!5m2!1svi!2s"
                 width="100%"
                 height="100%"
                 style={{ border: 0 }}
                 allowFullScreen=""
                 loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
+                referrerPolicy="no-referrer-when-cross-origin"
                 className="w-full h-full"
               />
             </div>
