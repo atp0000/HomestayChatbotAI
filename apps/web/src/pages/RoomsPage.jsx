@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import SiteLayout from "@/components/SiteLayout";
+import SiteLayout from "@/components/layout/SiteLayout";
 import { api, fmt, overlaps } from "@/lib/store";
-import SearchBar from "@/components/SearchBar";
+import SearchBar from "@/components/common/SearchBar";
 import pb from "@/lib/pocketbaseClient";
 
 import {
@@ -72,11 +72,11 @@ export default function RoomsPage() {
       .catch(() => {});
   }, []);
 
-  const roomBusy = (code) => {
+  const roomBusy = (roomId) => {
     if (!f.checkIn || !f.checkOut) return false;
     return bookings.some(
       (b) =>
-        b.roomCode === code &&
+        b.roomCode === roomId &&
         b.status !== "cancelled" &&
         overlaps(f.checkIn, f.checkOut, b.checkIn, b.checkOut)
     );
@@ -107,7 +107,7 @@ export default function RoomsPage() {
 
       return roomCapacity >= targetCapacity;
     })
-    .filter((r) => !roomBusy(r.code));
+    .filter((r) => !roomBusy(r.id));
   // Hàm phụ trợ lấy URL ảnh PocketBase chuẩn
   const getImageUrl = (record) => {
     const images = Array.isArray(record.images) ? record.images : record.images ? [record.images] : [];
@@ -203,7 +203,7 @@ export default function RoomsPage() {
                           {fmt(roomPrice)}
                         </span>
                         <span className="text-xs text-muted-foreground block font-normal">
-                          / đêm
+                          / Ngày
                         </span>
                       </div>
                     </div>

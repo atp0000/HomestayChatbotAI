@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import SiteLayout from "@/components/SiteLayout";
+import SiteLayout from "@/components/layout/SiteLayout";
 import { useAuth } from "@/lib/AuthContext";
 import { Palmtree, ArrowLeft } from "lucide-react";
 
@@ -10,16 +10,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+//Khai báo Hook & State
 export default function AuthPage() {
+  //useAuth(): Lấy ra 3 hàm gửi request API đã được định nghĩa ở AuthContext.
   const { login, signup, forgot } = useAuth();
+  //nav: Hàm điều hướng người dùng sang trang khác sau khi xác thực thành công.
   const nav = useNavigate();
-
+//tab: State quản lý chế độ hiện tại của giao diện, nhận 1 trong 3 giá trị: "login", "signup", hoặc "forgot".
   const [tab, setTab] = useState("login");
+  //f: Object lưu trữ toàn bộ dữ liệu form người dùng gõ vào (email, password, fullName, phone).
   const [f, setF] = useState({ email: "", password: "", fullName: "", phone: "" });
+   //msg & err: Lưu thông báo thành công hoặc thông báo lỗi để hiển thị ra UI.
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
+  
   const validate = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!f.email || !emailRegex.test(f.email)) {
@@ -49,7 +54,7 @@ export default function AuthPage() {
 
     return true;
   };
-
+//Hàm Xử lý Gửi Form (submit) & Điều hướng (go)
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
@@ -62,8 +67,9 @@ export default function AuthPage() {
         const a = await login(f.email, f.password);
         go(a.record);
       } else if (tab === "signup") {
-        const a = await signup(f);
-        go(a.record);
+        await signup(f);
+        setMsg("Đăng ký thành công! Vui lòng kiểm tra Hộp thư Email để kích hoạt tài khoản trước khi đăng nhập.");
+        setTab("login");
       } else {
         await forgot(f.email);
         setMsg("Đã gửi email khôi phục mật khẩu (nếu email tồn tại).");
@@ -74,7 +80,6 @@ export default function AuthPage() {
   };
 
   const go = (u) => nav(u?.role === "admin" ? "/admin" : u?.role === "receptionist" ? "/reception" : "/");
-
   return (
     <SiteLayout>
       <div className="max-w-md mx-auto px-4 py-16">

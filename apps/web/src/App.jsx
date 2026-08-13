@@ -1,6 +1,6 @@
 import React from 'react';
 import { Route, Routes, BrowserRouter as Router } from 'react-router-dom';
-import ScrollToTop from './components/ScrollToTop';
+import ScrollToTop from './components/layout/ScrollToTop';
 import { AuthProvider } from '@/lib/AuthContext';
 import HomePage from './pages/HomePage';
 import RoomsPage from './pages/RoomsPage';

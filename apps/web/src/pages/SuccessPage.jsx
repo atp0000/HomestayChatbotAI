@@ -139,7 +139,7 @@ export default function SuccessPage() {
                   <P label="Ngày nhận" value={fmtDate(b.checkIn)} />
                   <P label="Ngày trả" value={fmtDate(b.checkOut)} />
                   <P label="Số lượng khách" value={`${b.guests} người`} />
-                  <P label="Số đêm lưu trú" value={`${b.nights} đêm`} />
+                  <P label="Số đêm lưu trú" value={`${b.nights} Ngày`} />
                 </div>
               </div>
 

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
-import SiteLayout from "@/components/SiteLayout";
+import SiteLayout from "@/components/layout/SiteLayout";
 import pb from "@/lib/pocketbaseClient";
-import { api, fmtVND, nights, genCode, fmtDate } from "@/lib/store";
+import { api, fmtVND, nights, genCode, fmtDate, applyServiceQuantityDelta } from "@/lib/store";
 import { useAuth } from "@/lib/AuthContext";
-import TransferPaymentModal from "@/components/TransferPaymentModal";
+import TransferPaymentModal from "@/components/booking/TransferPaymentModal";
 
 import { 
   Minus, Plus, CreditCard, Wallet, Users, Bed, ConciergeBell, AlertCircle 
@@ -59,6 +59,8 @@ export default function BookingPage() {
     .map((s) => ({ ...s, count: qty[s.id] || 0 }))
     .filter((s) => s.count > 0)
     .map((s) => ({
+      serviceId: s.id,
+      id: s.id,
       name: s.name,
       count: s.count,
       unitPrice: s.price,
@@ -69,6 +71,7 @@ export default function BookingPage() {
   const total = roomTotal + svcTotal;
 
   const bump = (id, d) => setQty((q) => ({ ...q, [id]: Math.max(0, (q[id] || 0) + d) }));
+  const isStockTrackedService = (s) => Number(s?.quantity ?? 0) > 0;
 
   // Kiểm tra thông tin bắt buộc đã nhập đủ chưa
   const isFormValid = info.guestName && info.guestPhone && info.guestEmail && info.guestAddress;
@@ -104,6 +107,10 @@ export default function BookingPage() {
     }
     setSaving(true);
     try {
+      await applyServiceQuantityDelta(
+        svcDetail.map((item) => ({ serviceId: item.serviceId, count: item.count }))
+      );
+
       const rec = await pb.collection("bookings").create({
         ...getBookingPayload(),
         payMethod: "cash",
@@ -140,6 +147,7 @@ export default function BookingPage() {
                 {services.map((s) => {
                   const imageName = Array.isArray(s.image) ? s.image[0] : s.image;
                   const imageUrl = (s && imageName) ? pb.files.getURL(s, imageName) : null;
+                  const stockTracked = isStockTrackedService(s);
 
                   return (
                     <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg gap-4">
@@ -154,15 +162,27 @@ export default function BookingPage() {
                           <p className="text-sm text-muted-foreground">{fmtVND(s.price)} / {s.unit}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => bump(s.id, -1)}>
-                          <Minus className="w-3.5 h-3.5" />
+
+                      {stockTracked ? (
+                        <div className="flex items-center gap-2">
+                          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => bump(s.id, -1)}>
+                            <Minus className="w-3.5 h-3.5" />
+                          </Button>
+                          <span className="w-8 text-center font-semibold text-sm">{qty[s.id] || 0}</span>
+                          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => bump(s.id, 1)}>
+                            <Plus className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 px-3"
+                          onClick={() => bump(s.id, 1)}
+                        >
+                          Thêm
                         </Button>
-                        <span className="w-8 text-center font-semibold text-sm">{qty[s.id] || 0}</span>
-                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => bump(s.id, 1)}>
-                          <Plus className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
@@ -258,7 +278,7 @@ export default function BookingPage() {
                 <Row l="Loại phòng" v={roomTypeName} />
                 <Row l="Nhận phòng" v={fmtDate(st.checkIn)} />
                 <Row l="Trả phòng" v={fmtDate(st.checkOut)} />
-                <Row l="Thời gian" v={`${n} đêm`} />
+                <Row l="Thời gian" v={`${n} Ngày`} />
                 <Row l="Số lượng khách" v={`${st.guests} người`} />
                 <Separator className="my-2" />
                 <Row l="Giá phòng / đêm" v={fmtVND(roomPrice)} />

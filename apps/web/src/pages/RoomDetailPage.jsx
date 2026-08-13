@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import SiteLayout from "@/components/SiteLayout";
+import SiteLayout from "@/components/layout/SiteLayout";
 import pb from "@/lib/pocketbaseClient";
 import { api, fmt, overlaps } from "@/lib/store";
+import { useAuth } from "@/lib/AuthContext";
 
 // Components đã tái sử dụng
-import DateRangePicker from "@/components/DateRangePicker";
-import BookingAvailabilityAlert from "@/components/BookingAvailabilityAlert";
+import DateRangePicker from "@/components/common/DateRangePicker";
+import BookingAvailabilityAlert from "@/components/common/BookingAvailabilityAlert";
 
 // Lucide Icons
 import {
@@ -19,6 +20,7 @@ import {
   Maximize2,
   MessageSquare,
   ShieldAlert,
+  AlertCircle,
 } from "lucide-react";
 
 // shadcn/ui components
@@ -34,11 +36,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function RoomDetailPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [sp] = useSearchParams();
+  const { isAuthed } = useAuth(); // 🟢 Lấy trạng thái đăng nhập
 
   const [room, setRoom] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -132,6 +136,12 @@ export default function RoomDetailPage() {
 
   const proceed = () => {
     setErr("");
+
+    // 🛑 CHẶN BẠN CHƯA ĐĂNG NHẬP NGAY TẠI ĐÂY
+    if (!isAuthed) {
+      return setErr("Bạn vui lòng đăng nhập tài khoản để tiến hành đặt phòng.");
+    }
+
     const numGuests = Number(b.guests);
 
     if (!b.checkIn || !b.checkOut) {
@@ -232,7 +242,7 @@ export default function RoomDetailPage() {
               <span className="text-3xl font-extrabold text-primary">
                 {fmt(roomPrice)}
               </span>
-              <span className="text-sm text-muted-foreground">/ đêm</span>
+              <span className="text-sm text-muted-foreground">/ Ngày</span>
             </div>
 
             <h1 className="font-display text-3xl md:text-4xl font-extrabold mt-2">
@@ -400,7 +410,8 @@ export default function RoomDetailPage() {
                 />
               </div>
 
-              {/* TỰ ĐỘNG HIỂN THỊ CẢNH BÁO */}
+              
+              {/* TỰ ĐỘNG HIỂN THỊ CẢNH BÁO TRÙNG LỊCH */}
               <BookingAvailabilityAlert
                 checkIn={b.checkIn}
                 checkOut={b.checkOut}
