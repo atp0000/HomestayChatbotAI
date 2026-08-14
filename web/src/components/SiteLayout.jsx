@@ -165,7 +165,6 @@ export default function SiteLayout({ children }) {
             <Header />
             <main className="flex-1">{children}</main>
             <Footer />
-            <Chatbot />
         </div>
     );
 }

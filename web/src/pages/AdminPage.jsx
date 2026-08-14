@@ -38,11 +38,29 @@ export default function AdminPage() {
         api.roomTypes().then(setTypes);
         api.services().then(setServices);
         api.bookings().then(setBookings);
-        api.customers().then(setCustomers).catch(() => { });
+
+        // Lấy danh sách khách hàng và lọc chỉ lấy những người đã xác thực email (verified === true)
+        api.customers()
+            .then((data) => {
+                const verifiedCustomers = (data || []).filter((c) => c.verified === true);
+                setCustomers(verifiedCustomers);
+            })
+            .catch(() => { });
+
         api.reviews().then(setReviews);
     };
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => {
+        load();
+
+        const unsubscribe = pb.collection("bookings").subscribe("*", () => {
+            load();
+        });
+
+        return () => {
+            pb.collection("bookings").unsubscribe("*");
+        };
+    }, []);
 
     const occupied = bookings.filter((b) => b.status === "checkedin").length;
     const revenue = bookings
