@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import pb from "@/lib/pocketbaseClient";
 import { useAuth } from "@/lib/AuthContext";
-import { api, genCode, nights } from "@/lib/store";
+import { api, genCode, nights, createPayment } from "@/lib/store";
 
 // Components con của trang Lễ tân
 import StatusLegend from "@/components/reception/StatusLegend";
@@ -48,15 +48,23 @@ export default function ReceptionPage() {
     try {
       const [roomsData, bookingsData] = await Promise.all([
         pb.collection("rooms").getFullList({ expand: "room_type_id,room_type,roomType" }),
-        // Expand thêm roomTypeName để hiển thị đầy đủ thông tin khi query
         pb.collection("bookings").getFullList({ expand: "roomCode,roomTypeName,room_type_id" }),
       ]);
       setRooms(roomsData);
       setBookings(bookingsData);
+      setSel((prev) => {
+        if (!prev) return prev;
+        return bookingsData.find((b) => b.id === prev.id) || prev;
+      });
     } catch (err) {
-      // Fallback về helper cũ nếu lỗi
       api.rooms().then(setRooms).catch(() => {});
-      api.bookings().then(setBookings).catch(() => {});
+      api.bookings().then((data) => {
+        setBookings(data);
+        setSel((prev) => {
+          if (!prev) return prev;
+          return data.find((b) => b.id === prev.id) || prev;
+        });
+      }).catch(() => {});
     }
   };
 
@@ -249,10 +257,11 @@ export default function ReceptionPage() {
       checkInDate.setHours(0, 0, 0, 0);
       const effectiveStatus = checkInDate <= today ? "checkedin" : "pending";
 
+      // 🟢 ĐÃ SỬA: bỏ payMethod khỏi bookings (field này đã chuyển sang collection "payments")
       const recordData = {
         code: genCode(),
         roomCode: room.id,          // Lưu Record ID của phòng (Relation)
-        roomTypeName: roomTypeId,   // 🟢 ĐÃ SỬA: Lưu Record ID của loại phòng (Relation)
+        roomTypeName: roomTypeId,   // Lưu Record ID của loại phòng (Relation)
         guestName: formData.guestName,
         guestPhone: formData.guestPhone,
         guestEmail:
@@ -267,12 +276,20 @@ export default function ReceptionPage() {
         servicesTotal: 0,
         servicesDetail: [],
         total: total,
-        payMethod: formData.payMethod,
         payStatus: formData.payStatus,
         status: effectiveStatus,
       };
 
-      await pb.collection("bookings").create(recordData);
+      const createdBooking = await pb.collection("bookings").create(recordData);
+
+      // 🟢 MỚI: tạo record payments tương ứng, thay cho payMethod đã xóa khỏi bookings
+      await createPayment({
+        booking: createdBooking.id,
+        amount: total,
+        method: formData.payMethod,
+        status: formData.payStatus === "paid" ? "completed" : "pending",
+      });
+
       alert("Tạo đơn đặt phòng thành công!");
       setShowWalkInModal(false);
       load();
@@ -382,6 +399,7 @@ export default function ReceptionPage() {
         booking={sel}
         onClose={() => setSel(null)}
         onUpdateStatus={updateStatus}
+        onBookingUpdated={load}
       />
 
       <WalkInBookingModal

@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/select";
 import { UserPlus } from "lucide-react";
 import { fmt, fmtVND } from "@/lib/store";
-import DateRangePicker from "@/components/DateRangePicker";
-import BookingAvailabilityAlert from "@/components/BookingAvailabilityAlert";
+import DateRangePicker from "@/components/common/DateRangePicker";
+import BookingAvailabilityAlert from "@/components/common/BookingAvailabilityAlert";
 
 /**
  * MODAL ĐẶT PHÒNG CHO KHÁCH TRỰC TIẾP (WALK-IN)
@@ -258,7 +258,7 @@ export default function WalkInBookingModal({
                 <div className="flex justify-between text-[11px] text-muted-foreground">
                   <span>Thời gian:</span>
                   <span className="font-semibold text-foreground">
-                    {calcNights > 0 ? calcNights : 0} đêm
+                    {calcNights > 0 ? calcNights : 0} Ngày
                   </span>
                 </div>
               </div>

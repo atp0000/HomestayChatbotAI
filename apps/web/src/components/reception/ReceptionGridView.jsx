@@ -50,7 +50,7 @@ export default function ReceptionGridView({
               <CardContent className="p-3">
                 <p className="text-sm text-muted-foreground">{typeName}</p>
                 <p className="font-semibold mt-1 text-emerald-600">
-                  {fmt(price)}/đêm
+                  {fmt(price)}/Ngày
                 </p>
                 {st.b ? (
                   <p className="text-xs mt-2 font-bold text-primary truncate">
