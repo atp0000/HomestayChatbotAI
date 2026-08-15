@@ -74,8 +74,8 @@ export default function RoomDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    if (room) {
-      api.reviews(room.id || room.code).then(setReviews).catch(() => {});
+    if (room?.id) {
+      api.reviews(room.id).then(setReviews).catch(() => {});
     }
   }, [room]);
 
@@ -252,7 +252,7 @@ export default function RoomDetailPage() {
             <div className="flex flex-wrap items-center gap-4 mt-3 text-muted-foreground text-sm">
               <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
                 <BedDouble className="w-4 h-4 text-primary" />{" "}
-                {room.beds || "1 giường lớn"}
+                {room.beds ? `${room.beds} phòng ngủ` : "1 phòng ngủ"}
               </span>
               <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
                 <Users className="w-4 h-4 text-primary" /> Tối đa {maxCapacity} khách

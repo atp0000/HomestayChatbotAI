@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate, Navigate } from "react-router-dom";
 import SiteLayout from "@/components/layout/SiteLayout";
 import pb from "@/lib/pocketbaseClient";
-import { api, fmtVND, nights, genCode, fmtDate, applyServiceQuantityDelta } from "@/lib/store";
+import { api, fmtVND, nights, genCode, fmtDate, applyServiceQuantityDelta, createPayment } from "@/lib/store";
 import { useAuth } from "@/lib/AuthContext";
 import TransferPaymentModal from "@/components/booking/TransferPaymentModal";
 
@@ -113,8 +113,14 @@ export default function BookingPage() {
 
       const rec = await pb.collection("bookings").create({
         ...getBookingPayload(),
-        payMethod: "cash",
         payStatus: "unpaid",
+        status: "pending",
+      });
+
+      await createPayment({
+        booking: rec.id,
+        amount: total,
+        method: "cash",
         status: "pending",
       });
 

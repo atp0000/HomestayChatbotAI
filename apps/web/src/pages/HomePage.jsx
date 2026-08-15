@@ -178,7 +178,7 @@ export default function HomePage() {
                       {typeInfo?.name || "Chưa phân loại"}
                     </CardTitle>
                     <CardDescription className="text-sm">
-                      {r.beds || "Giường đôi"} · Phù hợp cho khách
+                      {r.beds ? `${r.beds} phòng ngủ` : "Giường đôi"} · Phù hợp cho khách
                     </CardDescription>
                   </CardHeader>
                 </div>

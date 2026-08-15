@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import pb from "@/lib/pocketbaseClient";
-
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -14,6 +13,7 @@ useEffect(() => {
     user,
     isAuthed: pb.authStore.isValid,
     role: user?.role || (user ? "customer" : null),
+ 
     login: async (email, password) => {
       try {
         return await pb.collection("users").authWithPassword(email, password);
@@ -21,6 +21,7 @@ useEffect(() => {
         throw new Error("Email hoặc mật khẩu không chính xác.");
       }
     },
+
     signup: async (data) => {
       let newUser = null;
 
@@ -36,12 +37,11 @@ useEffect(() => {
           emailVisibility: true,
         });
 
-        // 2. Thử gửi mail xác nhận trực tiếp
         await pb.collection("users").requestVerification(data.email);
 
         return true;
       } catch (err) {
-        // Nếu đã tạo record ở bước 1 nhưng gửi mail thất bại (vd: lỗi SMTP/Email không hợp lệ) -> Rollback bằng cách xóa ngay
+        
         if (newUser?.id) {
           try {
             await pb.collection("users").delete(newUser.id);

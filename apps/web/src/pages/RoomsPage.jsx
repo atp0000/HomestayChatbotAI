@@ -193,7 +193,7 @@ export default function RoomsPage() {
                             </span>
                           )}
                           <span className="flex items-center gap-1.5">
-                            <BedDouble className="w-4 h-4 text-primary" /> {r.beds || "1 phòng ngủ"}
+                            <BedDouble className="w-4 h-4 text-primary" /> {r.beds ? `${r.beds} phòng ngủ` : "1 phòng ngủ"}
                           </span>
                         </div>
                       </div>

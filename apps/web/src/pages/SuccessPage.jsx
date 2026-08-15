@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import pb from "@/lib/pocketbaseClient";
-import { fmtVND, fmtDate } from "@/lib/store";
+import { fmtVND, fmtDate, getPaymentByBooking } from "@/lib/store";
 
 // Lucide Icons
 import {
@@ -31,12 +31,16 @@ import { Separator } from "@/components/ui/separator";
 export default function SuccessPage() {
   const { id } = useParams();
   const [b, setB] = useState(null);
+  const [payment, setPayment] = useState(null);
 
   useEffect(() => {
     pb.collection("bookings")
       .getOne(id, { expand: "roomCode,roomTypeName" })
       .then(setB)
       .catch(() => {});
+    getPaymentByBooking(id)
+      .then(setPayment)
+      .catch(() => setPayment(null));
   }, [id]);
 
   if (!b) {
@@ -60,7 +64,7 @@ export default function SuccessPage() {
   );
 
   const payLabel =
-    b.payMethod === "transfer"
+    payment?.method === "transfer"
       ? "Chuyển khoản giữ phòng"
       : "Thanh toán khi nhận phòng";
 
