@@ -33,6 +33,10 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
   const [serviceQty, setServiceQty] = useState({});
   const [savingService, setSavingService] = useState(false);
 
+  // MỚI: tổng số tiền đã thanh toán thành công (từ các payment status = completed)
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [loadingPaid, setLoadingPaid] = useState(false);
+
   useEffect(() => {
     setBookingData(booking);
   }, [booking]);
@@ -40,6 +44,34 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
   useEffect(() => {
     api.services().then(setServices).catch(() => setServices([]));
   }, []);
+
+  // MỚI: mỗi khi mở booking khác nhau, load lại số tiền đã thanh toán thực tế
+  useEffect(() => {
+    if (!bookingData?.id) {
+      setPaidAmount(0);
+      return;
+    }
+    let cancelled = false;
+    setLoadingPaid(true);
+    pb.collection("payments")
+      .getFullList({
+        filter: `booking = "${bookingData.id}" && status = "completed"`,
+      })
+      .then((records) => {
+        if (cancelled) return;
+        const sum = records.reduce((acc, r) => acc + Number(r.amount || 0), 0);
+        setPaidAmount(sum);
+      })
+      .catch(() => {
+        if (!cancelled) setPaidAmount(0);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPaid(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingData?.id]);
 
   useEffect(() => {
     if (!bookingData) return;
@@ -98,6 +130,11 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
     0
   );
   const previewTotal = roomBaseTotal + serviceTotal;
+
+  // MỚI: tổng tiền hiện tại của booking (đã lưu, không phải preview)
+  const currentTotal = Number(bookingData?.total || roomBaseTotal);
+  // MỚI: số tiền còn phải thu = tổng hiện tại - đã thanh toán, không âm
+  const amountDue = Math.max(0, currentTotal - paidAmount);
 
   const isStockTrackedService = (service) => {
     const val = Number(service?.quantity ?? 0);
@@ -195,7 +232,7 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
 
   return (
     <Dialog open={!!bookingData} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
             Chi tiết đặt phòng
@@ -238,10 +275,27 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
             )}
             <p>
               Tổng tiền:{" "}
-              <b className="text-emerald-600 text-base">
-                {fmtVND(Number(bookingData.total || roomBaseTotal))}
+              <b className="text-slate-700 text-base">
+                {fmtVND(currentTotal)}
               </b>
             </p>
+
+            {/* MỚI: khối tách bạch đã thu / còn thu, đây là phần lễ tân cần nhìn vào */}
+            <div className="mt-2 rounded-lg border bg-slate-50 p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Đã thanh toán</span>
+                <b className="text-emerald-600">
+                  {loadingPaid ? "Đang tải..." : fmtVND(paidAmount)}
+                </b>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Còn phải thu</span>
+                <b className={amountDue > 0 ? "text-red-600 text-base" : "text-emerald-600 text-base"}>
+                  {loadingPaid ? "..." : fmtVND(amountDue)}
+                </b>
+              </div>
+            </div>
+
             {bookingData.note && (
               <p className="text-muted-foreground italic">
                 Ghi chú: {bookingData.note}
@@ -373,14 +427,18 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
             <Button
               onClick={() => {
                 if (
-                  window.confirm("Xác nhận trả phòng và thu đủ tiền thanh toán?")
+                  window.confirm(
+                    amountDue > 0
+                      ? `Xác nhận trả phòng và thu ${fmtVND(amountDue)} còn lại?`
+                      : "Xác nhận trả phòng (khách đã thanh toán đủ)?"
+                  )
                 )
                   onUpdateStatus(bookingData, "checkedout");
               }}
               className="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold gap-2 shadow"
             >
               <LogOutIcon className="w-4 h-4" />
-              Trả phòng & Thanh toán
+              Trả phòng {amountDue > 0 ? `& Thu ${fmtVND(amountDue)}` : "& Thanh toán"}
             </Button>
           )}
         </DialogFooter>
