@@ -3,8 +3,11 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { Palmtree, User, LogOut, History, LayoutDashboard, CalendarDays } from "lucide-react";
 import Chatbot from "@/components/Chatbot";
+<<<<<<< HEAD
 
 // Import các component của shadcn/ui
+=======
+>>>>>>> customer
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -79,6 +82,7 @@ function Header() {
 
           {isAuthed ? (
             <DropdownMenu>
+<<<<<<< HEAD
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <Avatar className="h-8 w-8">
@@ -89,6 +93,20 @@ function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>{user?.name || "Tài khoản"}</DropdownMenuLabel>
+=======
+            <DropdownMenuTrigger asChild>
+  <Button 
+    variant="ghost" 
+    className="px-4 py-2 rounded-full font-medium flex items-center gap-2 max-w-[200px]"
+  >
+    <span className="truncate">
+      {user?.fullName}
+    </span>
+  </Button>
+</DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel> Tài khoản</DropdownMenuLabel>
+>>>>>>> customer
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link to="/lich-su" className="cursor-pointer">
@@ -146,15 +164,22 @@ export function Footer() {
           <h4 className="font-semibold text-foreground mb-2">Thông tin liên hệ</h4>
           <p className="text-sm">Điện thoại: 035 356 600</p>
           <p className="text-sm">Email: Nuihomstay@gmail.com</p>
+<<<<<<< HEAD
           <p className="text-sm">Địa chỉ: TP. Huế</p>
+=======
+          <p className="text-sm">Địa chỉ: 2 Ngự Bình, An Cụ, TP. Huế</p>
+>>>>>>> customer
         </div>
       </div>
 
       <Separator />
+<<<<<<< HEAD
 
       <div className="py-4 text-center text-xs">
         © {new Date().getFullYear()} Núi Homestay. All rights reserved.
       </div>
+=======
+>>>>>>> customer
     </footer>
   );
 }
@@ -165,7 +190,10 @@ export default function SiteLayout({ children }) {
       <Header />
       <main className="flex-1">{children}</main>
       <Footer />
+<<<<<<< HEAD
       <Chatbot />
+=======
+>>>>>>> customer
     </div>
   );
 }
