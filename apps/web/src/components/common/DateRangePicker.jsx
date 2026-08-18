@@ -12,7 +12,6 @@ export default function DateRangePicker({ checkIn, checkOut, onChange, className
   // 1. Khi đổi Ngày Nhận
   const handleCheckInChange = (e) => {
     const newCheckIn = e.target.value;
-    // Nếu Ngày Trả hiện tại <= Ngày Nhận mới -> Tự động xoá Ngày Trả
     if (checkOut && checkOut <= newCheckIn) {
       onChange({ checkIn: newCheckIn, checkOut: "" });
     } else {

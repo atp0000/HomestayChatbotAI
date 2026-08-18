@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 
 /**
@@ -11,11 +11,11 @@ export function CustomerOnlyRoute({ children }) {
   if (role === "admin") return <Navigate to="/admin" replace />;
   if (role === "receptionist") return <Navigate to="/reception" replace />;
 
-  return children;
+  return children ? children : <Outlet />;
 }
 
 /**
- * Kiểm tra quyền hạn (Role-based Authorization) cho Admin / Lễ tân
+ * Kiểm tra quyền hạn cho Admin / Lễ tân
  */
 export function RequireRole({ allowedRoles, children }) {
   const { role } = useAuth();

@@ -12,15 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 //Khai báo Hook & State
 export default function AuthPage() {
-  //useAuth(): Lấy ra 3 hàm gửi request API đã được định nghĩa ở AuthContext.
   const { login, signup, forgot } = useAuth();
-  //nav: Hàm điều hướng người dùng sang trang khác sau khi xác thực thành công.
   const nav = useNavigate();
-//tab: State quản lý chế độ hiện tại của giao diện, nhận 1 trong 3 giá trị: "login", "signup", hoặc "forgot".
   const [tab, setTab] = useState("login");
-  //f: Object lưu trữ toàn bộ dữ liệu form người dùng gõ vào (email, password, fullName, phone).
   const [f, setF] = useState({ email: "", password: "", fullName: "", phone: "" });
-   //msg & err: Lưu thông báo thành công hoặc thông báo lỗi để hiển thị ra UI.
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
