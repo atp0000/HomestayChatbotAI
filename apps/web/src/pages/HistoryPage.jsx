@@ -5,18 +5,16 @@ import pb from "@/lib/pocketbaseClient";
 import { useAuth } from "@/lib/AuthContext";
 import { fmtVND, fmtDate } from "@/lib/store";
 
-// Lucide Icons
 import {
   Star,
   Calendar,
   Building2,
-  Clock,
   CheckCircle2,
   Send,
   ShoppingBag,
+  Loader2,
 } from "lucide-react";
 
-// shadcn/ui components
 import {
   Card,
   CardContent,
@@ -27,22 +25,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
-// Cấu hình nhãn và màu sắc Badge cho Trạng thái Thanh toán
 const PAY_CONFIG = {
   unpaid: { label: "Chưa thanh toán", variant: "destructive" },
-  deposit: { label: "Đã cọc giữ phòng", variant: "outline" },
+  deposit: { label: "Đã cọc", variant: "outline" },
   paid: { label: "Đã thanh toán", variant: "default" },
 };
 
-// Cấu hình nhãn và màu sắc Badge cho Trạng thái Đặt phòng
 const STATUS_CONFIG = {
-  pending: { label: "Chờ xác nhận", className: "bg-amber-500/15 text-amber-600 border-amber-200" },
-  confirmed: { label: "Đã xác nhận", className: "bg-blue-500/15 text-blue-600 border-blue-200" },
-  checkedin: { label: "Đang ở", className: "bg-emerald-500/15 text-emerald-600 border-emerald-200" },
-  checkedout: { label: "Đã trả phòng", className: "bg-purple-500/15 text-purple-600 border-purple-200" },
-  cancelled: { label: "Đã hủy", className: "bg-slate-500/15 text-slate-600 border-slate-200" },
+  pending: { label: "Chờ xác nhận", className: "bg-amber-500/10 text-amber-600 border-amber-200" },
+  confirmed: { label: "Đã xác nhận", className: "bg-blue-500/10 text-blue-600 border-blue-200" },
+  checkedin: { label: "Đang ở", className: "bg-emerald-500/10 text-emerald-600 border-emerald-200" },
+  checkedout: { label: "Đã trả phòng", className: "bg-purple-500/10 text-purple-600 border-purple-200" },
+  cancelled: { label: "Đã hủy", className: "bg-slate-500/10 text-slate-600 border-slate-200" },
 };
 
 export default function HistoryPage() {
@@ -50,23 +45,42 @@ export default function HistoryPage() {
   const [list, setList] = useState([]);
   const [rv, setRv] = useState({});
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState({});
 
   useEffect(() => {
     if (user?.id) {
       setLoading(true);
-      // Gọi PocketBase API với expand để lấy tên phòng và loại phòng chính xác từ relation
-      pb.collection("bookings")
-        .getFullList({
+
+      Promise.all([
+        pb.collection("bookings").getFullList({
           filter: pb.filter("customer = {:id}", { id: user.id }),
           expand: "roomCode,roomTypeName",
           sort: "-created",
+        }),
+        pb.collection("reviews").getFullList({
+          filter: pb.filter("author = {:name}", { name: user.fullName || "" }),
+        }).catch(() => []),
+      ])
+        .then(([bookingsRes, reviewsRes]) => {
+          setList(bookingsRes);
+
+          const initialRvState = {};
+          bookingsRes.forEach((b) => {
+            const roomTarget = b.expand?.roomCode?.id || b.roomCode;
+            const existingReview = reviewsRes.find(
+              (r) => r.booking === b.id || (r.roomCode === roomTarget && r.author === (b.guestName || user?.fullName))
+            );
+
+            initialRvState[b.id] = {
+              rating: existingReview?.rating || 5,
+              comment: existingReview?.comment || "",
+              done: Boolean(existingReview || b.isReviewed),
+            };
+          });
+
+          setRv(initialRvState);
         })
-        .then((res) => {
-          setList(res);
-        })
-        .catch((err) => {
-          console.error("Lỗi khi tải lịch sử:", err);
-        })
+        .catch((err) => console.error("Lỗi khi tải lịch sử:", err))
         .finally(() => setLoading(false));
     }
   }, [user]);
@@ -75,124 +89,128 @@ export default function HistoryPage() {
 
   const handleReview = async (b) => {
     const r = rv[b.id];
-    if (!r?.comment?.trim()) return;
+    if (!r?.comment?.trim() || r?.done) return;
+
+    setSubmitting((prev) => ({ ...prev, [b.id]: true }));
 
     try {
-      // Ưu tiên truyền Record ID của phòng nếu có relation, fallback về chuỗi b.roomCode
       const roomTarget = b.expand?.roomCode?.id || b.roomCode;
 
       await pb.collection("reviews").create({
+        booking: b.id,
         roomCode: roomTarget,
         author: b.guestName || user?.fullName || "Khách hàng",
         rating: r.rating || 5,
         comment: r.comment.trim(),
       });
-      setRv((s) => ({ ...s, [b.id]: { ...s[b.id], done: true } }));
+
+      try {
+        await pb.collection("bookings").update(b.id, { isReviewed: true });
+      } catch (e) {}
+
+      setRv((s) => ({
+        ...s,
+        [b.id]: { ...s[b.id], done: true },
+      }));
     } catch (e) {
       console.error("Lỗi gửi đánh giá:", e);
+    } finally {
+      setSubmitting((prev) => ({ ...prev, [b.id]: false }));
     }
   };
 
   return (
     <SiteLayout>
-      <div className="max-w-4xl mx-auto px-4 py-8 md:py-12">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display text-3xl md:text-4xl font-extrabold tracking-tight">
-              Lịch sử đặt phòng
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Quản lý các chuyến đi và đánh giá trải nghiệm dịch vụ của bạn
-            </p>
-          </div>
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight">Lịch sử đặt phòng</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Xem lại thông tin các chuyến đi và trải nghiệm của bạn
+          </p>
         </div>
 
-        {/* TRẠNG THÁI KHÔNG CÓ DỮ LIỆU */}
+        {/* TRẠNG THÁI TRỐNG */}
         {!loading && list.length === 0 && (
-          <Card className="text-center py-12 border-dashed">
-            <CardContent className="space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto text-muted-foreground">
-                <ShoppingBag className="w-8 h-8" />
-              </div>
+          <Card className="text-center py-10 border-dashed">
+            <CardContent className="space-y-3">
+              <ShoppingBag className="w-10 h-10 text-muted-foreground/60 mx-auto" />
               <div>
-                <CardTitle className="text-xl">Chưa có lịch sử đặt phòng</CardTitle>
-                <CardDescription className="mt-1">
-                  Bạn chưa thực hiện đơn đặt phòng nào tại homestay của chúng tôi.
+                <CardTitle className="text-base">Chưa có lịch sử đặt phòng</CardTitle>
+                <CardDescription className="text-xs">
+                  Bạn chưa thực hiện đơn đặt phòng nào tại homestay.
                 </CardDescription>
               </div>
-              <Button asChild className="mt-2 rounded-full">
-                <Link to="/rooms">Khám phá danh sách phòng ngay »</Link>
+              <Button asChild size="sm" className="rounded-full">
+                <Link to="/rooms">Khám phá phòng ngay »</Link>
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* DANH SÁCH ĐẶT PHÒNG */}
-        <div className="space-y-6">
+        {/* DANH SÁCH ĐẶT PHÒNG GIẢM TẢI */}
+        <div className="space-y-4">
           {list.map((b) => {
             const payInfo = PAY_CONFIG[b.payStatus] || { label: b.payStatus, variant: "outline" };
             const statusInfo = STATUS_CONFIG[b.status] || { label: b.status, className: "" };
             const currentRv = rv[b.id] || { rating: 5, comment: "", done: false };
+            const isSubmitting = submitting[b.id];
 
-            // Trích xuất linh hoạt Tên phòng và Loại phòng (Hỗ trợ cả Relation Expand lẫn Direct Field)
             const displayRoomCode = b.expand?.roomCode?.code || b.roomCode || "";
             const displayRoomType = b.expand?.roomTypeName?.name || b.roomTypeName || "";
 
+            const isEligibleForReview =
+              (b.payStatus === "paid" || b.status === "checkedout") &&
+              !b.isReviewed &&
+              !currentRv.done;
+
             return (
-              <Card key={b.id} className="overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="bg-muted/30 pb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="font-mono text-xs">
-                          #{b.code}
-                        </Badge>
-                        <Badge variant="outline" className={statusInfo.className}>
-                          {statusInfo.label}
-                        </Badge>
-                        <Badge variant={payInfo.variant}>{payInfo.label}</Badge>
-                      </div>
-                      <CardTitle className="text-xl mt-2 flex items-center gap-2">
-                        <Building2 className="w-5 h-5 text-primary" />
-                        {displayRoomType} {displayRoomCode && `· Phòng ${displayRoomCode}`}
-                      </CardTitle>
+              <Card key={b.id} className="overflow-hidden border shadow-none hover:border-slate-300 transition-colors">
+                {/* Header đơn giản, liền mạch */}
+                <CardHeader className="p-4 bg-muted/20 border-b">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-semibold text-slate-500">#{b.code}</span>
+                      <Badge variant="outline" className={`text-[11px] px-2 py-0 ${statusInfo.className}`}>
+                        {statusInfo.label}
+                      </Badge>
+                      <Badge variant={payInfo.variant} className="text-[11px] px-2 py-0">
+                        {payInfo.label}
+                      </Badge>
                     </div>
 
-                    <div className="sm:text-right">
-                      <p className="text-xs text-muted-foreground">Tổng tiền</p>
-                      <p className="text-2xl font-extrabold text-primary">{fmtVND(b.total)}</p>
+                    <div className="text-right">
+                      <span className="text-xs text-muted-foreground mr-1">Tổng:</span>
+                      <span className="text-base font-bold text-primary">{fmtVND(b.total)}</span>
                     </div>
                   </div>
+
+                  <CardTitle className="text-base font-medium flex items-center gap-1.5 mt-2">
+                    <Building2 className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span>{displayRoomType} {displayRoomCode && `· Phòng ${displayRoomCode}`}</span>
+                  </CardTitle>
                 </CardHeader>
 
-                <CardContent className="pt-4 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-muted-foreground bg-background p-3 rounded-lg border">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-primary" />
-                      <span>
-                        Thời gian: <b>{fmtDate(b.checkIn)}</b> → <b>{fmtDate(b.checkOut)}</b>
-                      </span>
+                <CardContent className="p-4 space-y-3">
+                  {/* Dòng thời gian thu gọn */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{fmtDate(b.checkIn)} → {fmtDate(b.checkOut)}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-primary" />
-                      <span>
-                        Thời lượng lưu trú: <b>{b.nights} Ngày</b>
-                      </span>
-                    </div>
+                    <span>Lưu trú: <b className="text-slate-700">{b.nights} đêm</b></span>
                   </div>
 
-                  {/* KHU VỰC ĐÁNH GIÁ (Cho phép đánh giá khi đã trả phòng hoặc đã thanh toán) */}
-                  {(b.payStatus === "paid" || b.status === "checkedout") && !currentRv.done && (
-                    <div className="pt-2">
-                      <Separator className="mb-4" />
-                      <div className="space-y-3 bg-muted/20 p-4 rounded-xl border">
-                        <p className="text-sm font-semibold flex items-center gap-2">
-                          <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                          Đánh giá trải nghiệm chuyến đi này
-                        </p>
+                  {/* KHU VỰC ĐÁNH GIÁ ĐƠN GIẢN */}
+                  {isEligibleForReview && (
+                    <div className="pt-2 border-t space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-slate-700 flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                          Đánh giá dịch vụ
+                        </span>
 
-                        {/* Chọn Số Sao */}
-                        <div className="flex items-center gap-1">
+                        {/* Chọn Số Sao Tinh Gọn */}
+                        <div className="flex items-center gap-0.5">
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
                               key={star}
@@ -203,52 +221,55 @@ export default function HistoryPage() {
                                   [b.id]: { ...s[b.id], rating: star },
                                 }))
                               }
-                              className="p-1 hover:scale-110 transition-transform focus:outline-none"
+                              className="p-0.5 focus:outline-none"
                             >
                               <Star
-                                className={`w-6 h-6 ${
+                                className={`w-4 h-4 ${
                                   (currentRv.rating || 5) >= star
                                     ? "fill-amber-400 text-amber-400"
-                                    : "text-muted-foreground/40"
+                                    : "text-slate-200"
                                 }`}
                               />
                             </button>
                           ))}
-                          <span className="text-xs text-muted-foreground ml-2 font-medium">
-                            ({currentRv.rating || 5}/5 sao)
-                          </span>
                         </div>
+                      </div>
 
-                        {/* Nhập nội dung & nút Gửi */}
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Chia sẻ cảm nhận của bạn về phòng nghỉ, dịch vụ..."
-                            value={currentRv.comment || ""}
-                            onChange={(e) =>
-                              setRv((s) => ({
-                                ...s,
-                                [b.id]: { ...s[b.id], comment: e.target.value },
-                              }))
-                            }
-                            className="bg-background"
-                          />
-                          <Button
-                            onClick={() => handleReview(b)}
-                            disabled={!currentRv.comment?.trim()}
-                            className="gap-1.5 shrink-0"
-                          >
-                            <Send className="w-4 h-4" /> Gửi
-                          </Button>
-                        </div>
+                      {/* Khung Nhập & Nút Gửi */}
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Nhận xét ngắn về phòng..."
+                          value={currentRv.comment || ""}
+                          onChange={(e) =>
+                            setRv((s) => ({
+                              ...s,
+                              [b.id]: { ...s[b.id], comment: e.target.value },
+                            }))
+                          }
+                          className="h-8 text-xs bg-background"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleReview(b)}
+                          disabled={!currentRv.comment?.trim() || isSubmitting}
+                          className="h-8 text-xs px-3 gap-1 shrink-0"
+                        >
+                          {isSubmitting ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Send className="w-3 h-3" />
+                          )}
+                          Gửi
+                        </Button>
                       </div>
                     </div>
                   )}
 
-                  {/* THÔNG BÁO ĐÃ ĐÁNH GIÁ XONG */}
-                  {currentRv.done && (
-                    <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" />
-                      <span>Cảm ơn bạn đã đóng góp đánh giá về dịch vụ của chúng tôi!</span>
+                  {/* THÔNG BÁO ĐÃ ĐÁNH GIÁ */}
+                  {(b.isReviewed || currentRv.done) && (
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-600 pt-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Đã gửi đánh giá</span>
                     </div>
                   )}
                 </CardContent>
