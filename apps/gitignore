@@ -1,0 +1,14 @@
+# Node dependencies
+node_modules/
+
+# PocketBase local database & uploaded files (Không push DB thật lên git)
+pocketbase_0.36.9_windows_amd64/pb_data/data.db
+pocketbase_0.36.9_windows_amd64/pb_data/storage/
+
+# Build files
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
