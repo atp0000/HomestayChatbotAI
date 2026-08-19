@@ -16,7 +16,7 @@ import {
   Minus,
   ShoppingBag,
 } from "lucide-react";
-import { fmtVND, fmtDate, api, applyServiceQuantityDelta } from "@/lib/store";
+import { fmtVND, fmtDate, api, applyServiceQuantityDelta ,releaseServiceQuantity} from "@/lib/store";
 
 /**
  * POPUP CHI TIẾT ĐẶT PHÒNG
@@ -410,16 +410,22 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
                 Nhận phòng
               </Button>
               <Button
-                variant="destructive"
-                onClick={() => {
-                  if (window.confirm("Xác nhận hủy đơn đặt phòng này?"))
-                    onUpdateStatus(bookingData, "cancelled");
-                }}
-                className="flex-1 gap-1.5"
-              >
-                <XCircle className="w-4 h-4" />
-                Hủy đặt
-              </Button>
+  variant="destructive"
+  onClick={async () => {
+    if (!window.confirm("Xác nhận hủy đơn đặt phòng này?")) return;
+    try {
+      await releaseServiceQuantity(bookingData.servicesDetail || []);
+    } catch (err) {
+      console.warn("Hoàn kho dịch vụ thất bại:", err?.message);
+      // vẫn tiếp tục hủy đơn dù hoàn kho lỗi, tránh kẹt đơn
+    }
+    onUpdateStatus(bookingData, "cancelled");
+  }}
+  className="flex-1 gap-1.5"
+>
+  <XCircle className="w-4 h-4" />
+  Hủy đặt
+</Button>
             </>
           )}
 

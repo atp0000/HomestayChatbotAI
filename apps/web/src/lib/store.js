@@ -121,3 +121,35 @@ export const api = {
   customers: () =>
     pb.collection("users").getFullList({ filter: "role = 'customer' || role = ''", sort: "-created" }),
 };
+// Hoàn lại số lượng dịch vụ khi đơn bị hủy
+export async function releaseServiceQuantity(serviceItems = []) {
+  if (!Array.isArray(serviceItems) || serviceItems.length === 0) return;
+
+  for (const item of serviceItems) {
+    const serviceId = item.serviceId || item.id;
+    const count = Number(item.count ?? item.quantity ?? item.qty ?? 0);
+    if (!serviceId || count <= 0) continue;
+
+    try {
+      const service = await pb.collection("services").getOne(serviceId);
+      const stockQty = Number(service?.quantity ?? 0);
+      const isStockTracked =
+        service?.quantity !== "" &&
+        service?.quantity !== null &&
+        service?.quantity !== undefined &&
+        Number.isFinite(stockQty);
+
+      if (!isStockTracked) continue;
+
+      await pb.collection("services").update(serviceId, {
+        quantity: stockQty + count, // cộng ngược lại số đã trừ
+      });
+    } catch (err) {
+      if (err?.status === 404 || err?.response?.code === 404) {
+        console.warn(`Bỏ qua dịch vụ không tồn tại khi hoàn kho: ${serviceId}`);
+        continue;
+      }
+      throw err;
+    }
+  }
+}

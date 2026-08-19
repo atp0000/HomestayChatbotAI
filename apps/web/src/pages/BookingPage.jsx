@@ -240,14 +240,14 @@ export default function BookingPage() {
                   <div className={`flex items-center space-x-3 border p-4 rounded-xl cursor-pointer ${pay === "cash" ? "border-primary bg-primary/5" : ""}`} onClick={() => setPay("cash")}>
                     <RadioGroupItem value="cash" id="pay-cash" />
                     <Label htmlFor="pay-cash" className="cursor-pointer flex items-center gap-2 font-medium">
-                      <Wallet className="w-4 h-4 text-muted-foreground" /> Thanh toán khi nhận phòng (Trực tiếp)
+                      <Wallet className="w-4 h-4 text-muted-foreground" /> Thanh toán khi nhận phòng
                     </Label>
                   </div>
 
                   <div className={`flex items-center space-x-3 border p-4 rounded-xl cursor-pointer ${pay === "transfer" ? "border-primary bg-primary/5" : ""}`} onClick={() => setPay("transfer")}>
                     <RadioGroupItem value="transfer" id="pay-transfer" />
                     <Label htmlFor="pay-transfer" className="cursor-pointer flex items-center gap-2 font-medium">
-                      <CreditCard className="w-4 h-4 text-muted-foreground" /> Chuyển khoản QR (Tự động xác nhận)
+                      <CreditCard className="w-4 h-4 text-muted-foreground" /> Chuyển khoản (100%)
                     </Label>
                   </div>
                 </RadioGroup>
