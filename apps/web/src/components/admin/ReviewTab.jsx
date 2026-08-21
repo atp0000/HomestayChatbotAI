@@ -8,6 +8,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import pb from "@/lib/pocketbaseClient";
+import Pagination from "@/components/layout/Pagination";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +19,20 @@ export default function ReviewTab({ reviews = [], load }) {
   const [saving, setSaving] = useState({});
   const [expandedIds, setExpandedIds] = useState({});
 
+  // State Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Số lượng đánh giá trên 1 trang
+
   const sortedReviews = useMemo(
     () => [...(reviews || [])].sort((a, b) => new Date(b.created) - new Date(a.created)),
     [reviews]
   );
+
+  // Tính toán dữ liệu phân trang
+  const totalItems = sortedReviews.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedReviews = sortedReviews.slice(startIndex, startIndex + itemsPerPage);
 
   const toggleReview = (reviewId) => {
     setExpandedIds((prev) => ({
@@ -71,7 +83,8 @@ export default function ReviewTab({ reviews = [], load }) {
         </Card>
       ) : (
         <div className="space-y-4">
-          {sortedReviews.map((review) => {
+          {/* DANH SÁCH ĐÁNH GIÁ THEO TRANG */}
+          {paginatedReviews.map((review) => {
             const expandedRoom = review.expand?.roomCode;
             const roomLabel =
               expandedRoom?.name ||
@@ -176,6 +189,18 @@ export default function ReviewTab({ reviews = [], load }) {
               </Card>
             );
           })}
+
+          {/* COMPONENT PHÂN TRANG */}
+          <div className="rounded-xl border border-border bg-card overflow-hidden mt-4">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              itemName="đánh giá"
+            />
+          </div>
         </div>
       )}
     </div>

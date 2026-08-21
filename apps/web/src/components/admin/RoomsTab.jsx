@@ -1,16 +1,17 @@
 import { useState } from "react";
 import pb from "@/lib/pocketbaseClient";
 import { fmt } from "@/lib/store";
-import { Trash2, Edit, Power, Plus, X,} from "lucide-react";
+import { Trash2, Edit, Power, Plus, X } from "lucide-react";
+import Pagination from "@/components/layout/Pagination";
+
+const ITEMS_PER_PAGE = 5; // Mặc định 5 dòng 1 trang
 
 export default function RoomsTab({ rooms, types, del, load }) {
   const [subTab, setSubTab] = useState("roomList");
   const [showModal, setShowModal] = useState(false);
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [editingTypeId, setEditingTypeId] = useState(null);
-
   const [typeForm, setTypeForm] = useState({ code: "", name: "", price: "" });
-
   const [roomForm, setRoomForm] = useState({
     code: "",
     room_type_id: "",
@@ -24,6 +25,24 @@ export default function RoomsTab({ rooms, types, del, load }) {
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewImages, setPreviewImages] = useState([]);
+
+  // State quản lý phân trang
+  const [typePage, setTypePage] = useState(1);
+  const [roomPage, setRoomPage] = useState(1);
+
+  // Phân trang dữ liệu loại phòng
+  const totalTypePages = Math.ceil((types?.length || 0) / ITEMS_PER_PAGE) || 1;
+  const paginatedTypes = (types || []).slice(
+    (typePage - 1) * ITEMS_PER_PAGE,
+    typePage * ITEMS_PER_PAGE
+  );
+
+  // Phân trang dữ liệu danh sách phòng
+  const totalRoomPages = Math.ceil((rooms?.length || 0) / ITEMS_PER_PAGE) || 1;
+  const paginatedRooms = (rooms || []).slice(
+    (roomPage - 1) * ITEMS_PER_PAGE,
+    roomPage * ITEMS_PER_PAGE
+  );
 
   const toggleRoomStatus = async (room) => {
     const newStatus = room.status === "active" ? "inactive" : "active";
@@ -200,7 +219,10 @@ export default function RoomsTab({ rooms, types, del, load }) {
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-1 bg-secondary/80 p-1 rounded-lg">
           <button
-            onClick={() => setSubTab("roomTypes")}
+            onClick={() => {
+              setSubTab("roomTypes");
+              setTypePage(1);
+            }}
             className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${
               subTab === "roomTypes" ? "bg-sky-200 text-slate-900 shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -208,7 +230,10 @@ export default function RoomsTab({ rooms, types, del, load }) {
             Loại phòng
           </button>
           <button
-            onClick={() => setSubTab("roomList")}
+            onClick={() => {
+              setSubTab("roomList");
+              setRoomPage(1);
+            }}
             className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${
               subTab === "roomList" ? "bg-sky-300 text-slate-900 shadow-sm font-bold" : "text-muted-foreground hover:text-foreground"
             }`}
@@ -236,26 +261,41 @@ export default function RoomsTab({ rooms, types, del, load }) {
               </tr>
             </thead>
             <tbody>
-              {types.map((t) => (
-                <tr key={t.id} className="border-t border-border hover:bg-secondary/30">
-                  <td className="p-3 font-semibold">{t.code || "---"}</td>
-                  <td className="p-3">{t.name}</td>
-                  <td className="p-3">{fmt(t.price)}</td>
-                  
-                  <td className="p-3">
-                    <div className="flex items-center gap-3">
-                      <button onClick={() => del("room_types", t.id)} className="text-rose-500 hover:opacity-80" title="Xóa">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleOpenEditTypeModal(t)} className="text-emerald-500 hover:opacity-80" title="Chỉnh sửa">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+              {paginatedTypes.length > 0 ? (
+                paginatedTypes.map((t) => (
+                  <tr key={t.id} className="border-t border-border hover:bg-secondary/30">
+                    <td className="p-3 font-semibold">{t.code || "---"}</td>
+                    <td className="p-3">{t.name}</td>
+                    <td className="p-3">{fmt(t.price)}</td>
+                    <td className="p-3">
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => del("room_types", t.id)} className="text-rose-500 hover:opacity-80" title="Xóa">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleOpenEditTypeModal(t)} className="text-emerald-500 hover:opacity-80" title="Chỉnh sửa">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} className="p-4 text-center text-muted-foreground">Chưa có dữ liệu loại phòng</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
+
+          {/* Component Phân Trang Cho Loại Phòng */}
+        <Pagination
+  currentPage={typePage}
+  totalPages={totalTypePages}
+  onPageChange={setTypePage}
+  totalItems={types?.length || 0}
+  itemsPerPage={ITEMS_PER_PAGE}
+  itemName="loại phòng"
+/>
         </div>
       )}
 
@@ -270,53 +310,67 @@ export default function RoomsTab({ rooms, types, del, load }) {
               </tr>
             </thead>
             <tbody>
-              {rooms.map((r) => {
-                const roomType = r.expand?.room_type_id || types.find((t) => t.id === r.room_type_id);
-                return (
-                  <tr key={r.id} className="border-t border-border hover:bg-secondary/30">
-                    <td className="p-3 font-semibold">{r.code}</td>
-                    <td className="p-3">{roomType?.name || "N/A"}</td>
-                   <td className="p-3 font-medium">
-  {r.capacity ?? 0}
-</td>
-                    <td className="p-3">{fmt(roomType?.price || 0)}</td>
-                    <td className="p-3">{r.area}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        r.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                      }`}>
-                        {r.status === "active" ? "Đang hoạt động" : "Ngừng kinh doanh"}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      {r.images && r.images.length > 0 ? (
-                        <img src={pb.files.getUrl(r, r.images[0])} alt="Room" className="w-12 h-9 object-cover rounded-md border" />
-                      ) : (
-                        <div className="w-12 h-9 bg-gray-200 rounded-md flex items-center justify-center text-xs text-gray-400">Ảnh</div>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => del("rooms", r.id)} className="text-rose-500 hover:opacity-80" title="Xóa">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleOpenEditModal(r)} className="text-emerald-500 hover:opacity-80" title="Chỉnh sửa">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => toggleRoomStatus(r)}
-                          className={`hover:opacity-80 transition-colors ${r.status === "active" ? "text-emerald-500" : "text-rose-500"}`}
-                          title={r.status === "active" ? "Ngừng kinh doanh" : "Kích hoạt"}
-                        >
-                          <Power className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {paginatedRooms.length > 0 ? (
+                paginatedRooms.map((r) => {
+                  const roomType = r.expand?.room_type_id || types.find((t) => t.id === r.room_type_id);
+                  return (
+                    <tr key={r.id} className="border-t border-border hover:bg-secondary/30">
+                      <td className="p-3 font-semibold">{r.code}</td>
+                      <td className="p-3">{roomType?.name || "N/A"}</td>
+                      <td className="p-3 font-medium">{r.capacity ?? 0}</td>
+                      <td className="p-3">{fmt(roomType?.price || 0)}</td>
+                      <td className="p-3">{r.area}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          r.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                        }`}>
+                          {r.status === "active" ? "Đang hoạt động" : "Ngừng kinh doanh"}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        {r.images && r.images.length > 0 ? (
+                          <img src={pb.files.getUrl(r, r.images[0])} alt="Room" className="w-12 h-9 object-cover rounded-md border" />
+                        ) : (
+                          <div className="w-12 h-9 bg-gray-200 rounded-md flex items-center justify-center text-xs text-gray-400">Ảnh</div>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => del("rooms", r.id)} className="text-rose-500 hover:opacity-80" title="Xóa">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleOpenEditModal(r)} className="text-emerald-500 hover:opacity-80" title="Chỉnh sửa">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => toggleRoomStatus(r)}
+                            className={`hover:opacity-80 transition-colors ${r.status === "active" ? "text-emerald-500" : "text-rose-500"}`}
+                            title={r.status === "active" ? "Ngừng kinh doanh" : "Kích hoạt"}
+                          >
+                            <Power className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={8} className="p-4 text-center text-muted-foreground">Chưa có dữ liệu phòng</td>
+                </tr>
+              )}
             </tbody>
           </table>
+
+          {/* Component Phân Trang Cho Danh Sách Phòng */}
+       <Pagination
+  currentPage={roomPage}
+  totalPages={totalRoomPages}
+  onPageChange={setRoomPage}
+  totalItems={rooms?.length || 0}
+  itemsPerPage={ITEMS_PER_PAGE}
+  itemName="phòng"
+/>
         </div>
       )}
 

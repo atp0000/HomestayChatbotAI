@@ -1,12 +1,23 @@
-import React from "react";
+import React, { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Pagination from "@/components/layout/Pagination";
 
-export default function CustomersTab({ customers, del }) {
+export default function CustomersTab({ customers = [], del }) {
+  // State quản lý Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Số lượng khách hàng trên 1 trang
+
+  // Tính toán dữ liệu hiển thị theo trang
+  const totalItems = customers.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedCustomers = customers.slice(startIndex, startIndex + itemsPerPage);
+
   return (
     <div>
       <h2 className="font-display text-2xl font-bold mb-6">Danh sách khách hàng</h2>
-      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm flex flex-col">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b bg-muted/50 text-sm font-semibold">
@@ -17,8 +28,8 @@ export default function CustomersTab({ customers, del }) {
             </tr>
           </thead>
           <tbody>
-            {customers && customers.length > 0 ? (
-              customers.map((c) => (
+            {paginatedCustomers && paginatedCustomers.length > 0 ? (
+              paginatedCustomers.map((c) => (
                 <tr key={c.id} className="border-b hover:bg-muted/30 text-sm">
                   {/* Tên khách hàng */}
                   <td className="p-3 font-medium">
@@ -57,6 +68,16 @@ export default function CustomersTab({ customers, del }) {
             )}
           </tbody>
         </table>
+
+        {/* COMPONENT PHÂN TRANG */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          itemName="khách hàng"
+        />
       </div>
     </div>
   );

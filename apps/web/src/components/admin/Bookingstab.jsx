@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search } from "lucide-react";
 import BookingTable from "@/components/admin/BookingTable";
+import Pagination from "@/components/layout/Pagination";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -25,8 +26,9 @@ export default function BookingsTab({ bookings = [], setStatus, del }) {
     });
   }, [bookings, searchTerm]);
 
-  // 📄 Cắt dữ liệu theo trang (10 dòng/trang)
-  const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE) || 1;
+  // 📄 Tính toán và cắt dữ liệu theo trang
+  const totalItems = filteredBookings.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
   const paginatedBookings = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredBookings.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -52,54 +54,24 @@ export default function BookingsTab({ bookings = [], setStatus, del }) {
         </div>
       </div>
 
-      {/* Bảng dữ liệu gốc (truyền danh sách đã lọc và phân trang) */}
-      <BookingTable
-        bookings={paginatedBookings}
-        setStatus={setStatus}
-        del={del}
-      />
+      {/* Bảng dữ liệu và Component Phân trang */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm flex flex-col">
+        <BookingTable
+          bookings={paginatedBookings}
+          setStatus={setStatus}
+          del={del}
+        />
 
-      {/* Điều hướng phân trang */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-muted-foreground">
-            Hiển thị {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{" "}
-            {Math.min(currentPage * ITEMS_PER_PAGE, filteredBookings.length)}{" "}
-            trong tổng số {filteredBookings.length} đơn
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-border hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-3 py-1 text-xs rounded-lg border ${
-                  currentPage === page
-                    ? "bg-primary text-primary-foreground border-primary font-bold"
-                    : "border-border hover:bg-secondary"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg border border-border hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+        {/* COMPONENT PHÂN TRANG */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={totalItems}
+          itemsPerPage={ITEMS_PER_PAGE}
+          itemName="đơn đặt phòng"
+        />
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, Edit, X } from "lucide-react";
 import pb from "@/lib/pocketbaseClient";
 import { fmtVND } from "@/lib/store";
+import Pagination from "@/components/layout/Pagination";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,11 +21,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export default function ServicesTab({ services, del, load }) {
+export default function ServicesTab({ services = [], del, load }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  // Form State (Đã bỏ field 'code')
+  // State quản lý Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Số lượng dịch vụ trên 1 trang (có thể đổi thành 10)
+
+  // Tính toán dữ liệu hiển thị theo trang
+  const totalItems = services.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedServices = services.slice(startIndex, startIndex + itemsPerPage);
+
+  // Form State
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -105,8 +116,8 @@ export default function ServicesTab({ services, del, load }) {
         </Button>
       </div>
 
-      {/* DANH SÁCH BẢNG DỊCH VỤ (Bỏ cột Mã dịch vụ) */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      {/* DANH SÁCH BẢNG DỊCH VỤ */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden flex flex-col">
         <Table>
           <TableHeader className="bg-sky-300">
             <TableRow className="hover:bg-sky-300">
@@ -119,7 +130,7 @@ export default function ServicesTab({ services, del, load }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {services.map((s) => (
+            {paginatedServices.map((s) => (
               <TableRow key={s.id}>
                 <TableCell className="font-semibold">{s.name}</TableCell>
                 <TableCell className="font-medium">{fmtVND(s.price)}</TableCell>
@@ -173,9 +184,19 @@ export default function ServicesTab({ services, del, load }) {
             )}
           </TableBody>
         </Table>
+
+        {/* COMPONENT PHÂN TRANG */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          itemName="dịch vụ"
+        />
       </div>
 
-      {/* MODAL THÊM / SỬA (Bỏ ô nhập Mã dịch vụ) */}
+      {/* MODAL THÊM / SỬA */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>

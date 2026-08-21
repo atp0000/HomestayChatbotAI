@@ -16,13 +16,13 @@ export default function StatsTab({ bookings = [] }) {
   // Danh sách các năm có sẵn để chọn (từ 2024 đến năm hiện tại)
   const availableYears = useMemo(() => {
     const years = [];
-    for (let y = 2024; y <= currentYear; y++) {
+    for (let y = 2025; y <= currentYear; y++) {
       years.push(y);
     }
     return years;
   }, [currentYear]);
 
-  // 🟢 TÍNH TOÁN DỮ LIỆU ĐỒ THỊ & TỔNG DOANH THU (CHUẨN CHECK-OUT)
+  // TÍNH TOÁN DỮ LIỆU ĐỒ THỊ & TỔNG DOANH THU (CHUẨN CHECK-OUT)
   const { chartData, totalRevenue, totalCompletedCount } = useMemo(() => {
     let sumRevenue = 0;
     let completedCount = 0;
