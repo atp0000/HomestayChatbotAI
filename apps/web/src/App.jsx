@@ -21,24 +21,22 @@ function App() {
         <ScrollToTop />
         <Chatbot />
         <Routes>
-          {/* 1. Trang Đăng nhập / Đăng ký */}
+          {/* 1. Trang Auth dành cho tất cả mọi người */}
           <Route path="/auth" element={<AuthPage />} />
 
-          {/* 2. Trang công khai cho Khách xem tự do */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/rooms" element={<RoomsPage />} />
-          <Route path="/rooms/:id" element={<RoomDetailPage />} />
-          <Route path="/gioi-thieu" element={<HomePage />} />
-          <Route path="/lien-he" element={<HomePage />} />
-
-          {/* 3. Trang yêu cầu đăng nhập đối với Khách hàng */}
+          {/* 2. Nhóm các trang dành riêng cho Khách hàng */}
           <Route element={<CustomerOnlyRoute />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/rooms" element={<RoomsPage />} />
+            <Route path="/rooms/:id" element={<RoomDetailPage />} />
             <Route path="/booking" element={<BookingPage />} />
             <Route path="/success/:id" element={<SuccessPage />} />
             <Route path="/lich-su" element={<HistoryPage />} />
+            <Route path="/gioi-thieu" element={<HomePage />} />
+            <Route path="/lien-he" element={<HomePage />} />
           </Route>
 
-          {/* 4. Nhóm trang Quản trị & Lễ tân */}
+          {/* 3. Nhóm các trang dành cho Nội bộ */}
           <Route path="/admin" element={<RequireRole allowedRoles={['admin']}><AdminPage /></RequireRole>} />
           <Route path="/reception" element={<RequireRole allowedRoles={['receptionist']}><ReceptionPage /></RequireRole>} />
         </Routes>

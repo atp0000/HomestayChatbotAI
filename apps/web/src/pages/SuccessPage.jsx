@@ -65,7 +65,7 @@ export default function SuccessPage() {
 
   const payLabel =
     payment?.method === "transfer"
-      ? "Chuyển khoản giữ phòng"
+      ? "Chuyển khoản (100%)"
       : "Thanh toán khi nhận phòng";
 
   // Trích xuất thông tin Tên phòng và Loại phòng từ Relation Expand hoặc Field gốc

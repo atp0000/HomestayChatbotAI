@@ -226,7 +226,7 @@ export default function Chatbot() {
           width: 56,
           height: 56,
           borderRadius: '50%',
-          background: '#0f766e',
+          background: '#008DBA',
           color: '#fff',
           border: 'none',
           fontSize: 24,

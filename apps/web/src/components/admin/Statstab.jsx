@@ -28,13 +28,13 @@ export default function StatsTab({ bookings = [] }) {
     let completedCount = 0;
     let data = [];
 
-    // 🔴 1. Chỉ lấy các đơn đã hoàn thành trả phòng (checkedout) và có ngày checkOut
+    //  1. Chỉ lấy các đơn đã hoàn thành trả phòng (checkedout) và có ngày checkOut
     const checkedOutBookings = bookings.filter(
       (b) => b.status === "checkedout" && b.checkOut
     );
 
     if (viewMode === "month") {
-      // 2️⃣ XEM THEO NGÀY TRONG THÁNG
+      // XEM THEO NGÀY TRONG THÁNG
       const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
       const daysMap = {};
       for (let d = 1; d <= daysInMonth; d++) {
@@ -62,7 +62,7 @@ export default function StatsTab({ bookings = [] }) {
       }));
 
     } else {
-      // 3️⃣ XEM THEO 12 THÁNG TRONG NĂM
+      //XEM THEO 12 THÁNG TRONG NĂM
       const monthsMap = {};
       for (let m = 1; m <= 12; m++) {
         monthsMap[m] = 0;
@@ -99,7 +99,7 @@ export default function StatsTab({ bookings = [] }) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <h2 className="font-display text-2xl font-bold">Thống kê doanh thu</h2>
 
-        {/* ⚡ BỘ LỌC THỜI GIAN DỘNG */}
+        {/* BỘ LỌC THỜI GIAN DỘNG */}
         <div className="flex flex-wrap items-center gap-2 bg-card border border-border p-2 rounded-xl shadow-sm">
           {/* Chọn chế độ xem */}
           <select

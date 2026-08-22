@@ -4,12 +4,8 @@ import SiteLayout from "@/components/layout/SiteLayout";
 import pb from "@/lib/pocketbaseClient";
 import { api, fmt, overlaps } from "@/lib/store";
 import { useAuth } from "@/lib/AuthContext";
-
-// Components đã tái sử dụng
 import DateRangePicker from "@/components/common/DateRangePicker";
 import BookingAvailabilityAlert from "@/components/common/BookingAvailabilityAlert";
-
-// Lucide Icons
 import {
   CheckCircle2,
   Star,
@@ -22,8 +18,6 @@ import {
   ShieldAlert,
   AlertCircle,
 } from "lucide-react";
-
-// shadcn/ui components
 import {
   Card,
   CardContent,
@@ -42,7 +36,7 @@ export default function RoomDetailPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [sp] = useSearchParams();
-  const { isAuthed } = useAuth(); // 🟢 Lấy trạng thái đăng nhập
+  const { isAuthed } = useAuth();
 
   const [room, setRoom] = useState(null);
   const [reviews, setReviews] = useState([]);
@@ -58,7 +52,6 @@ export default function RoomDetailPage() {
   });
 
   useEffect(() => {
-    // Expand relation room_type_id / room_type / roomType
     pb.collection("rooms")
       .getOne(id, { expand: "room_type_id,room_type,roomType" })
       .then((r) => {
@@ -257,9 +250,7 @@ export default function RoomDetailPage() {
               <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
                 <Users className="w-4 h-4 text-primary" /> Tối đa {maxCapacity} khách
               </span>
-              <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
-                <Building2 className="w-4 h-4 text-primary" /> Phòng tắm riêng
-              </span>
+              
               {room.area && (
                 <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
                   <Maximize2 className="w-4 h-4 text-primary" /> {room.area}

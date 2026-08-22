@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import pb from "@/lib/pocketbaseClient";
+
 const AuthCtx = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(pb.authStore.record);
-useEffect(() => {
+
+  useEffect(() => {
     const unsub = pb.authStore.onChange((_t, rec) => setUser(rec));
     return unsub;
   }, []);
@@ -13,7 +15,7 @@ useEffect(() => {
     user,
     isAuthed: pb.authStore.isValid,
     role: user?.role || (user ? "customer" : null),
- 
+
     login: async (email, password) => {
       try {
         return await pb.collection("users").authWithPassword(email, password);
@@ -26,7 +28,6 @@ useEffect(() => {
       let newUser = null;
 
       try {
-        // 1. Tạo tài khoản người dùng
         newUser = await pb.collection("users").create({
           email: data.email,
           password: data.password,
@@ -41,7 +42,6 @@ useEffect(() => {
 
         return true;
       } catch (err) {
-        
         if (newUser?.id) {
           try {
             await pb.collection("users").delete(newUser.id);
@@ -57,7 +57,17 @@ useEffect(() => {
         throw new Error(err.message || "Tạo tài khoản thất bại. Vui lòng thử lại.");
       }
     },
-   forgot: async (email) => {
+
+    // 🚀 THÊM HÀM GỬI LẠI EMAIL XÁC THỰC
+    resendVerification: async (email) => {
+      try {
+        return await pb.collection("users").requestVerification(email);
+      } catch (err) {
+        throw new Error("Không thể gửi lại email xác nhận. Vui lòng kiểm tra lại địa chỉ email.");
+      }
+    },
+
+    forgot: async (email) => {
       try {
         return await pb.collection("users").requestPasswordReset(email);
       } catch (err) {

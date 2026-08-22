@@ -10,7 +10,6 @@ import {
   Tv,
   AirVent,
   ShowerHead,
-  Coffee,
   Sparkles,
   BedDouble,
   Maximize,
@@ -41,9 +40,6 @@ const getAmenityIcon = (name = "") => {
   }
   if (lower.includes("máy sấy") || lower.includes("quạt")) {
     return <Wind className="w-3.5 h-3.5" />;
-  }
-  if (lower.includes("cà phê") || lower.includes("trà") || lower.includes("ăn sáng")) {
-    return <Coffee className="w-3.5 h-3.5" />;
   }
   return <Sparkles className="w-3.5 h-3.5" />;
 };
@@ -82,25 +78,19 @@ export default function RoomsPage() {
     );
   };
 
-  // 🟢 ĐÃ THÊM LOGIC LỌC THEO SỨC CHỨA
- const list = rooms
+  const list = rooms
     .filter((r) => r.status === "active")
     .filter((r) => {
       // 1. Lọc theo Loại phòng
       if (!f.type || f.type === "all") return true;
-
-      // Lấy tên loại phòng từ quan hệ expand
       const roomTypeObj = r.expand?.room_type_id || r.expand?.room_type;
       const typeName = roomTypeObj?.name || r.typeName;
-
       return typeName === f.type;
     })
     .filter((r) => {
       // 2. Lọc theo Sức chứa
       if (!f.capacity) return true;
       const targetCapacity = Number(f.capacity);
-
-      // Lấy capacity trực tiếp từ room (hoặc fallback từ room_type nếu r.capacity trống)
       const roomCapacity = Number(
         r.capacity ?? r.expand?.room_type_id?.capacity ?? 0
       );
@@ -108,11 +98,12 @@ export default function RoomsPage() {
       return roomCapacity >= targetCapacity;
     })
     .filter((r) => !roomBusy(r.id));
+
   // Hàm phụ trợ lấy URL ảnh PocketBase chuẩn
   const getImageUrl = (record) => {
     const images = Array.isArray(record.images) ? record.images : record.images ? [record.images] : [];
     if (!images.length) return "";
-    return pb.files.getUrl(record, images[0]);
+    return pb.files.getURL(record, images[0]);
   };
 
   return (
@@ -224,17 +215,10 @@ export default function RoomsPage() {
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-border/40 sm:justify-end">
                     <Button
-                      variant="outline"
                       onClick={() => nav("/rooms/" + r.id)}
-                      className="rounded-full font-semibold px-6"
+                      className="rounded-full font-semibold px-6 shadow-sm bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       Xem chi tiết
-                    </Button>
-                    <Button
-                      onClick={() => nav(`/rooms/${r.id}?book=1&${sp.toString()}`)}
-                      className="rounded-full font-semibold px-6 shadow-sm"
-                    >
-                      Đặt phòng ngay
                     </Button>
                   </div>
                 </div>

@@ -2,14 +2,6 @@ import { useEffect } from "react";
 import { Trash2 } from "lucide-react";
 import { fmtVND, fmtDate } from "@/lib/store";
 
-const ST = {
-  pending: "Chờ xác nhận",
-  confirmed: "Đã xác nhận",
-  checkedin: "Đang ở",
-  checkedout: "Đã trả phòng",
-  cancelled: "Đã hủy",
-};
-
 export default function BookingTable({ bookings, setStatus, del }) {
   // 🟢 Tự động quét và cập nhật Database khi quá ngày trả phòng
   useEffect(() => {
@@ -38,6 +30,24 @@ export default function BookingTable({ bookings, setStatus, del }) {
       }
     });
   }, [bookings, setStatus]);
+
+  // Hàm chuyển đổi mã trạng thái sang Tiếng Việt
+  const renderStatusText = (status) => {
+    switch (status) {
+      case "pending":
+        return "Chờ xác nhận";
+      case "confirmed":
+        return "Đã xác nhận";
+      case "checkedin":
+        return "Đang ở";
+      case "checkedout":
+        return "Đã trả phòng";
+      case "cancelled":
+        return "Đã hủy";
+      default:
+        return status;
+    }
+  };
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-x-auto shadow-sm">
@@ -84,17 +94,9 @@ export default function BookingTable({ bookings, setStatus, del }) {
                 </td>
                 <td className="p-3 font-semibold">{fmtVND(b.total)}</td>
                 <td className="p-3">
-                  <select
-                    value={b.status}
-                    onChange={(e) => setStatus(b.id, e.target.value)}
-                    className="bg-secondary rounded-lg px-2 py-1 font-semibold cursor-pointer border border-border"
-                  >
-                    {Object.entries(ST).map(([k, l]) => (
-                      <option key={k} value={k}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="inline-block bg-secondary rounded-lg px-2.5 py-1 font-semibold border border-border">
+                    {renderStatusText(b.status)}
+                  </span>
                 </td>
                 <td className="p-3">
                   <button
