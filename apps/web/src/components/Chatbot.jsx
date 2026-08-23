@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
+import { useNavigate } from 'react-router-dom';
 import pb from '../lib/pocketbaseClient';
 
 function genUserId() {
@@ -28,7 +28,7 @@ async function callCoze(userMessage, conversationId, userId) {
 }
 
 export default function Chatbot() {
-  const navigate = useNavigate(); // 2. Kích hoạt hook chuyển trang
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
     { role: 'bot', text: 'Xin chào! Mình là trợ lý Núi Homestay, bạn cần hỏi gì về phòng nhỉ?' },
@@ -46,6 +46,49 @@ export default function Chatbot() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
+
+  // Bọc hàm chuyển trang để không bị thay đổi reference
+  const handleLinkClick = useCallback((e, href) => {
+    if (href && href.startsWith('/')) {
+      e.preventDefault();
+      navigate(href);
+    }
+  }, [navigate]);
+
+  // Tối ưu ReactMarkdown components với useMemo để tránh mount lại DOM mỗi khi `input` thay đổi
+  const markdownComponents = useMemo(() => ({
+    p: ({ node, ...props }) => <p style={{ margin: 0, marginBottom: 4 }} {...props} />,
+    ul: ({ node, ...props }) => <ul style={{ paddingLeft: 16, margin: '4px 0' }} {...props} />,
+    ol: ({ node, ...props }) => <ol style={{ paddingLeft: 16, margin: '4px 0' }} {...props} />,
+    a: ({ node, href, children, ...props }) => (
+      <a
+        href={href}
+        onClick={(e) => handleLinkClick(e, href)}
+        style={{ color: '#0f766e', fontWeight: 600, textDecoration: 'underline' }}
+        {...props}
+      >
+        {children}
+      </a>
+    ),
+    img: ({ node, ...props }) => (
+      <img
+        {...props}
+        style={{
+          width: '100%',
+          height: 140,
+          objectFit: 'cover',
+          borderRadius: 8,
+          marginTop: 6,
+          marginBottom: 6,
+          display: 'block',
+          cursor: 'pointer',
+        }}
+        onError={(e) => {
+          e.target.style.display = 'none';
+        }}
+      />
+    ),
+  }), [handleLinkClick]);
 
   const send = async () => {
     const text = input.trim();
@@ -123,54 +166,7 @@ export default function Chatbot() {
                   {m.role === 'user' ? (
                     m.text
                   ) : (
-                    <ReactMarkdown
-                      components={{
-                        p: ({ node, ...props }) => <p style={{ margin: 0, marginBottom: 4 }} {...props} />,
-                        ul: ({ node, ...props }) => <ul style={{ paddingLeft: 16, margin: '4px 0' }} {...props} />,
-                        ol: ({ node, ...props }) => <ol style={{ paddingLeft: 16, margin: '4px 0' }} {...props} />,
-                        
-                        // 3. Custom thẻ <a> để chuyển trang trong React Router
-                        a: ({ node, href, children, ...props }) => {
-                          const handleClick = (e) => {
-                            if (href && href.startsWith('/')) {
-                              e.preventDefault();
-                              navigate(href); // Điều hướng mượt sang RoomDetailPage
-                            }
-                          };
-                          return (
-                            <a
-                              href={href}
-                              onClick={handleClick}
-                              style={{ color: '#0f766e', fontWeight: 600, textDecoration: 'underline' }}
-                              {...props}
-                            >
-                              {children}
-                            </a>
-                          );
-                        },
-
-                        // 4. Custom thẻ <img> hiển thị hình ảnh phòng đẹp mắt
-                        img: ({ node, ...props }) => (
-                          <img
-                            {...props}
-                            style={{
-                              width: '100%',
-                              height: 140,
-                              objectFit: 'cover',
-                              borderRadius: 8,
-                              marginTop: 6,
-                              marginBottom: 6,
-                              display: 'block',
-                              cursor: 'pointer',
-                            }}
-                            onError={(e) => {
-                              // Tự động ẩn nếu link ảnh lỗi
-                              e.target.style.display = 'none';
-                            }}
-                          />
-                        ),
-                      }}
-                    >
+                    <ReactMarkdown components={markdownComponents}>
                       {m.text}
                     </ReactMarkdown>
                   )}

@@ -39,16 +39,23 @@ export default function AdminPage() {
     api.rooms().then(setRooms);
     api.roomTypes().then(setTypes);
     api.services().then(setServices);
-    api.bookings().then(setBookings);
-    
-    // Lấy danh sách khách hàng và lọc chỉ lấy những người đã xác thực email (verified === true)
+
+    // 🟢 SỬA TẠI ĐÂY: Thêm expand "roomCode,customer" cho bookings
+    pb.collection("bookings")
+      .getFullList({ expand: "roomCode,customer", sort: "-created" })
+      .then(setBookings)
+      .catch(() => {
+        api.bookings().then(setBookings).catch(() => {});
+      });
+
+    // Lấy danh sách khách hàng đã xác thực email
     api.customers()
       .then((data) => {
         const verifiedCustomers = (data || []).filter((c) => c.verified === true);
         setCustomers(verifiedCustomers);
       })
       .catch(() => {});
-      
+
     api.reviews().then(setReviews);
   };
 

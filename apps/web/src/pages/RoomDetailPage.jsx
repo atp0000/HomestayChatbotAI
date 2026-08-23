@@ -5,7 +5,8 @@ import pb from "@/lib/pocketbaseClient";
 import { api, fmt, overlaps } from "@/lib/store";
 import { useAuth } from "@/lib/AuthContext";
 import DateRangePicker from "@/components/common/DateRangePicker";
-import BookingAvailabilityAlert from "@/components/common/BookingAvailabilityAlert";
+
+// Lucide Icons
 import {
   CheckCircle2,
   Star,
@@ -16,8 +17,11 @@ import {
   Maximize2,
   MessageSquare,
   ShieldAlert,
+  DoorClosed,
   AlertCircle,
 } from "lucide-react";
+
+// shadcn/ui components
 import {
   Card,
   CardContent,
@@ -38,99 +42,122 @@ export default function RoomDetailPage() {
   const [sp] = useSearchParams();
   const { isAuthed } = useAuth();
 
-  const [room, setRoom] = useState(null);
+  const [roomType, setRoomType] = useState(null);
+  const [allRooms, setAllRooms] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [err, setErr] = useState("");
   const [activeImgIdx, setActiveImgIdx] = useState(0);
 
+  // 1. Tải dữ liệu từ URL Query String
   const [b, setB] = useState({
     checkIn: sp.get("checkIn") || "",
     checkOut: sp.get("checkOut") || "",
-    guests: sp.get("guests") || 2,
+    guests: sp.get("guests") || sp.get("capacity") || 2,
     type: "",
   });
 
   useEffect(() => {
-    pb.collection("rooms")
-      .getOne(id, { expand: "room_type_id,room_type,roomType" })
-      .then((r) => {
-        setRoom(r);
-        const roomTypeObj =
-          r.expand?.room_type_id || r.expand?.room_type || r.expand?.roomType;
-        const roomTypeName = roomTypeObj?.name || r.typeName || "";
-        setB((s) => ({ ...s, type: roomTypeName }));
+    setB((prev) => ({
+      ...prev,
+      checkIn: sp.get("checkIn") || prev.checkIn || "",
+      checkOut: sp.get("checkOut") || prev.checkOut || "",
+      guests: sp.get("guests") || sp.get("capacity") || prev.guests || 2,
+    }));
+  }, [sp]);
+
+  useEffect(() => {
+    // Tải thông tin loại phòng
+    pb.collection("room_types")
+      .getOne(id)
+      .then((type) => {
+        setRoomType(type);
+        setB((s) => ({ ...s, type: type.name || "" }));
       })
       .catch(() => {});
 
+    // Tải toàn bộ phòng vật lý
+    pb.collection("rooms")
+      .getFullList()
+      .then((data) => setAllRooms(data || []))
+      .catch(() => setAllRooms([]));
+
+    // Tải tất cả đơn đặt phòng
     api.bookings().then(setBookings).catch(() => {});
   }, [id]);
 
   useEffect(() => {
-    if (room?.id) {
-      api.reviews(room.id).then(setReviews).catch(() => {});
+    if (roomType?.id) {
+      api.reviews(roomType.id).then(setReviews).catch(() => {});
     }
-  }, [room]);
+  }, [roomType]);
 
-  if (!room) {
+  if (!roomType) {
     return (
       <SiteLayout>
         <div className="py-24 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
           <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <span>Đang tải thông tin phòng...</span>
+          <span>Đang tải thông tin loại phòng...</span>
         </div>
       </SiteLayout>
     );
   }
 
-  const roomType =
-    room.expand?.room_type_id || room.expand?.room_type || room.expand?.roomType;
-  const roomTypeName = roomType?.name || "Chưa phân loại";
-  const roomPrice = roomType?.price ?? room.price ?? 0;
-
-  // 🟢 LẤY SỨC CHỨA TỐI ĐA (MẶC ĐỊNH LÀ 2 NẾU TRONG DB CHƯA ĐỊNH NGHĨA)
-  const maxCapacity = Number(
-    room.maxGuests || room.capacity || roomType?.maxGuests || roomType?.capacity || 2
-  );
-
-  // 🟢 BẢO VỆ CHUYỂN ĐỔI DỮ LIỆU SANG MẢNG CHO AMENITIES VÀ RULES
-  const safeAmenities = Array.isArray(room.amenities)
-    ? room.amenities
-    : typeof room.amenities === "string"
-    ? room.amenities.split(",").map((s) => s.trim()).filter(Boolean)
-    : [];
-
-  const safeRules = Array.isArray(room.rules)
-    ? room.rules
-    : typeof room.rules === "string"
-    ? room.rules.split(",").map((s) => s.trim()).filter(Boolean)
-    : [];
-
-  // Kiểm tra trùng lịch trực tiếp để hỗ trợ nút bấm
-  const busy =
-    b.checkIn &&
-    b.checkOut &&
-    bookings.some((x) => {
-      const bookingRoomCode = x.expand?.roomCode?.code || x.roomCode;
-      const bookingRoomId = x.expand?.roomCode?.id || x.roomCode;
-
+  // --- LOGIC KIỂM TRA PHÒNG BẬN ---
+  const isRoomBusy = (room) => {
+    if (!b.checkIn || !b.checkOut) return false;
+    return bookings.some((bk) => {
       const isSameRoom =
-        bookingRoomCode === room.code ||
-        bookingRoomId === room.id ||
-        x.roomCode === room.code ||
-        x.roomCode === room.id;
+        bk.roomId === room.id ||
+        bk.room_id === room.id ||
+        bk.roomCode === room.code ||
+        bk.roomCode === room.id ||
+        bk.expand?.roomCode?.id === room.id ||
+        bk.expand?.roomCode?.code === room.code;
 
       return (
         isSameRoom &&
-        x.status !== "cancelled" &&
-        overlaps(b.checkIn, b.checkOut, x.checkIn, x.checkOut)
+        bk.status !== "cancelled" &&
+        overlaps(b.checkIn, b.checkOut, bk.checkIn, bk.checkOut)
       );
     });
+  };
+
+  // Lọc lấy các phòng vật lý thuộc loại phòng hiện tại và đang RẢNH
+  const getAvailableRooms = () => {
+    const roomsInType = allRooms.filter((r) => {
+      const typeId = r.room_type_id || r.roomTypeId || r.room_type || r.type;
+      return typeId === roomType.id || typeId === roomType.name;
+    });
+
+    if (!b.checkIn || !b.checkOut) return roomsInType;
+
+    return roomsInType.filter((room) => !isRoomBusy(room));
+  };
+
+  const availableRooms = getAvailableRooms();
+  const availableCount = availableRooms.length;
+  const isBusy = b.checkIn && b.checkOut && availableCount === 0;
+
+  const roomTypeName = roomType.name || "Chưa phân loại";
+  const roomPrice = roomType.price ?? 0;
+  const maxCapacity = Number(roomType.capacity || roomType.maxGuests || 2);
+
+  const safeAmenities = Array.isArray(roomType.amenities)
+    ? roomType.amenities
+    : typeof roomType.amenities === "string"
+    ? roomType.amenities.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const safeRules = Array.isArray(roomType.rules)
+    ? roomType.rules
+    : typeof roomType.rules === "string"
+    ? roomType.rules.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 
   const proceed = () => {
     setErr("");
 
-    // 🛑 CHẶN BẠN CHƯA ĐĂNG NHẬP NGAY TẠI ĐÂY
     if (!isAuthed) {
       return setErr("Bạn vui lòng đăng nhập tài khoản để tiến hành đặt phòng.");
     }
@@ -146,19 +173,30 @@ export default function RoomDetailPage() {
     if (numGuests < 1) {
       return setErr("Số lượng khách phải lớn hơn 0.");
     }
-    // 🟢 VALIDATE SỐ LƯỢNG KHÁCH TRƯỚC KHI ĐẶT
     if (numGuests > maxCapacity) {
-      return setErr(`Phòng này chỉ chứa tối đa ${maxCapacity} khách.`);
+      return setErr(`Loại phòng này chỉ chứa tối đa ${maxCapacity} khách.`);
     }
-    if (busy) {
-      return setErr("Phòng đã có người đặt trong khoảng thời gian này.");
+
+    if (availableRooms.length === 0) {
+      return setErr("Tất cả các phòng thuộc loại này đã được đặt kín trong khoảng thời gian trên.");
     }
+
+    const randomIndex = Math.floor(Math.random() * availableRooms.length);
+    const selectedRoom = availableRooms[randomIndex];
+
+    const roomWithExpand = {
+      ...selectedRoom,
+      expand: {
+        ...(selectedRoom.expand || {}),
+        room_type_id: roomType,
+      },
+    };
 
     nav("/booking", {
       state: {
-        room,
-        roomId: room.id,
-        roomTypeId: roomType?.id || room.room_type_id,
+        room: roomWithExpand,
+        roomType,
+        roomTypeId: roomType.id,
         ...b,
         guests: numGuests,
       },
@@ -167,19 +205,19 @@ export default function RoomDetailPage() {
 
   const getImageUrl = (filename) => {
     if (!filename) return "";
-    return pb.files.getURL(room, filename);
+    return pb.files.getUrl(roomType, filename);
   };
 
-  const rawImages = Array.isArray(room.images)
-    ? room.images
-    : room.images
-    ? [room.images]
+  const rawImages = Array.isArray(roomType.images)
+    ? roomType.images
+    : roomType.images
+    ? [roomType.images]
     : [];
   const imageUrls = rawImages.map((img) => getImageUrl(img)).filter(Boolean);
 
   return (
     <SiteLayout>
-      {/* KHU VỰC BÌA & GALLERY ẢNH */}
+      {/* BÌA & GALLERY ẢNH */}
       <div className="bg-muted/40 border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-4">
           <div className="relative h-[360px] md:h-[450px] rounded-2xl overflow-hidden shadow-sm bg-muted flex items-center justify-center">
@@ -190,16 +228,16 @@ export default function RoomDetailPage() {
                 className="w-full h-full object-cover transition-all duration-500"
               />
             ) : (
-              <span className="text-muted-foreground text-sm">
-                Chưa có ảnh hiển thị
-              </span>
+              <span className="text-muted-foreground text-sm">Chưa có ảnh hiển thị</span>
             )}
-            <Badge
-              className="absolute top-4 left-4 font-mono text-sm shadow-md"
-              variant="secondary"
-            >
-              #{room.code}
-            </Badge>
+            {roomType.code && (
+              <Badge
+                className="absolute top-4 left-4 font-mono text-sm shadow-md"
+                variant="secondary"
+              >
+                #{roomType.code}
+              </Badge>
+            )}
           </div>
 
           {imageUrls.length > 1 && (
@@ -226,93 +264,92 @@ export default function RoomDetailPage() {
         </div>
       </div>
 
-      {/* NỘI DUNG CHI TIẾT */}
+      {/* CHI TIẾT VÀ KHUNG ĐẶT PHÒNG */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 grid lg:grid-cols-3 gap-8">
-        {/* CỘT TRÁI: THÔNG TIN PHÒNG */}
         <div className="lg:col-span-2 space-y-8">
           <div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-primary">
                 {fmt(roomPrice)}
               </span>
-              <span className="text-sm text-muted-foreground">/ Ngày</span>
+              <span className="text-sm text-muted-foreground">/ Đêm</span>
             </div>
 
             <h1 className="font-display text-3xl md:text-4xl font-extrabold mt-2">
-              {roomTypeName} · {room.code}
+              {roomTypeName}
             </h1>
 
             <div className="flex flex-wrap items-center gap-4 mt-3 text-muted-foreground text-sm">
               <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
                 <BedDouble className="w-4 h-4 text-primary" />{" "}
-                {room.beds ? `${room.beds} phòng ngủ` : "1 phòng ngủ"}
+                {roomType.beds ? `${roomType.beds} giường` : "1 giường"}
               </span>
               <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
                 <Users className="w-4 h-4 text-primary" /> Tối đa {maxCapacity} khách
               </span>
-              
-              {room.area && (
+              {roomType.area && (
                 <span className="flex items-center gap-1.5 bg-muted/60 px-3 py-1.5 rounded-lg border">
-                  <Maximize2 className="w-4 h-4 text-primary" /> {room.area}
+                  <Maximize2 className="w-4 h-4 text-primary" /> {roomType.area}
                 </span>
               )}
             </div>
 
             <p className="mt-6 leading-relaxed text-muted-foreground text-sm md:text-base border-t pt-6">
-              {room.description}
+              {roomType.description || "Chưa có mô tả cho loại phòng này."}
             </p>
           </div>
 
-          {/* CÁC TIỆN ÍCH */}
-          <div>
-            <h3 className="font-display text-xl font-bold text-primary flex items-center gap-2 mb-4">
-              <CheckCircle2 className="w-5 h-5" /> Tiện ích đi kèm
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {safeAmenities.map((a, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2.5 p-3 rounded-xl border bg-card text-sm font-medium shadow-sm"
-                >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>{a}</span>
-                </div>
-              ))}
+          {/* TIỆN ÍCH */}
+          {safeAmenities.length > 0 && (
+            <div>
+              <h3 className="font-display text-xl font-bold text-primary flex items-center gap-2 mb-4">
+                <CheckCircle2 className="w-5 h-5" /> Tiện ích đi kèm
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {safeAmenities.map((a, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2.5 p-3 rounded-xl border bg-card text-sm font-medium shadow-sm"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>{a}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* QUY ĐỊNH PHÒNG */}
-          <div>
-            <h3 className="font-display text-xl font-bold text-destructive flex items-center gap-2 mb-4">
-              <ShieldAlert className="w-5 h-5" /> Quy định lưu trú
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {safeRules.map((a, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-2.5 p-3 rounded-xl border border-destructive/20 bg-destructive/5 text-sm font-medium text-destructive"
-                >
-                  <Ban className="w-4 h-4 shrink-0" />
-                  <span>{a}</span>
-                </div>
-              ))}
+          {safeRules.length > 0 && (
+            <div>
+              <h3 className="font-display text-xl font-bold text-destructive flex items-center gap-2 mb-4">
+                <ShieldAlert className="w-5 h-5" /> Quy định lưu trú
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {safeRules.map((a, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2.5 p-3 rounded-xl border border-destructive/20 bg-destructive/5 text-sm font-medium text-destructive"
+                  >
+                    <Ban className="w-4 h-4 shrink-0" />
+                    <span>{a}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* ĐÁNH GIÁ TỪ KHÁCH HÀNG */}
+          {/* ĐÁNH GIÁ */}
           <div>
             <h3 className="font-display text-xl font-bold text-primary flex items-center gap-2 mb-4">
-              <MessageSquare className="w-5 h-5" /> Đánh giá từ khách hàng (
-              {reviews.length})
+              <MessageSquare className="w-5 h-5" /> Đánh giá từ khách hàng ({reviews.length})
             </h3>
-
             <div className="space-y-4">
               {reviews.length === 0 && (
                 <p className="text-muted-foreground italic text-sm py-4">
-                  Chưa có đánh giá nào cho phòng này!
+                  Chưa có đánh giá nào cho loại phòng này!
                 </p>
               )}
-
               {reviews.map((rv) => (
                 <Card key={rv.id} className="border-border/60">
                   <CardContent className="p-4 space-y-2">
@@ -327,14 +364,10 @@ export default function RoomDetailPage() {
                         ))}
                       </div>
                     </div>
-
                     <p className="text-sm text-foreground/90">{rv.comment}</p>
-
                     {rv.reply && (
                       <div className="mt-3 pl-3 border-l-2 border-primary bg-primary/5 p-2 rounded-r-lg text-xs md:text-sm">
-                        <span className="font-semibold text-primary">
-                          Homestay:
-                        </span>{" "}
+                        <span className="font-semibold text-primary">Homestay: </span>
                         <span className="text-muted-foreground">{rv.reply}</span>
                       </div>
                     )}
@@ -345,7 +378,7 @@ export default function RoomDetailPage() {
           </div>
         </div>
 
-        {/* CỘT PHẢI: KHUNG ĐẶT PHÒNG (STICKY) */}
+        {/* KHUNG ĐẶT PHÒNG STICKY */}
         <div>
           <Card className="sticky top-20 shadow-lg border-primary/20 bg-card">
             <CardHeader className="bg-primary/5 pb-4 border-b">
@@ -369,11 +402,7 @@ export default function RoomDetailPage() {
                 <Label className="text-xs font-semibold flex items-center gap-1.5">
                   <Building2 className="w-4 h-4 text-primary" /> Loại phòng
                 </Label>
-                <Input
-                  value={b.type}
-                  readOnly
-                  className="bg-muted/50 font-medium"
-                />
+                <Input value={b.type} readOnly className="bg-muted/50 font-medium" />
               </div>
 
               <div className="space-y-1.5">
@@ -385,7 +414,6 @@ export default function RoomDetailPage() {
                     Tối đa: {maxCapacity} khách
                   </span>
                 </div>
-                {/* 🟢 GIỚI HẠN INPUT VỚI MAX */}
                 <Input
                   type="number"
                   min={1}
@@ -401,20 +429,40 @@ export default function RoomDetailPage() {
                 />
               </div>
 
-              
-              {/* TỰ ĐỘNG HIỂN THỊ CẢNH BÁO TRÙNG LỊCH */}
-              <BookingAvailabilityAlert
-                checkIn={b.checkIn}
-                checkOut={b.checkOut}
-                roomCode={room.id || room.code}
-                bookings={bookings}
-                customError={err}
-              />
+              {/* Thông báo tình trạng phòng trống */}
+              {/* Thông báo tình trạng phòng trống */}
+{b.checkIn && b.checkOut && (
+  <div className="pt-2">
+    {isBusy ? (
+      <div className="p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-xs font-semibold flex items-center gap-2">
+        <AlertCircle className="w-4 h-4 shrink-0" />
+        <span>Đã hết phòng trong khoảng thời gian này.</span>
+      </div>
+    ) : (
+      <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 text-xs font-medium flex items-center gap-2">
+        <DoorClosed className="w-4 h-4 text-emerald-600 shrink-0" />
+        <span>
+          Còn <strong>{availableCount}</strong> phòng trống khả dụng.
+        </span>
+      </div>
+    )}
+  </div>
+)}
+
+
+              {/* Thông báo lỗi khi người dùng bấm Đặt phòng (chưa chọn ngày, quá số khách...) */}
+              {err && (
+                <Alert variant="destructive" className="py-2.5">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <AlertDescription className="text-xs">{err}</AlertDescription>
+                </Alert>
+              )}
             </CardContent>
 
             <CardFooter className="pt-2">
               <Button
                 onClick={proceed}
+                disabled={isBusy}
                 className="w-full font-semibold py-6 text-base rounded-xl shadow-md"
                 size="lg"
               >

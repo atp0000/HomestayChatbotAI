@@ -12,9 +12,10 @@ import {
   ShowerHead,
   Sparkles,
   BedDouble,
-  Maximize,
+  Users,
   Refrigerator,
   Wind,
+  DoorClosed,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -47,63 +48,96 @@ const getAmenityIcon = (name = "") => {
 export default function RoomsPage() {
   const [sp, setSp] = useSearchParams();
   const nav = useNavigate();
-  const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [roomTypes, setRoomTypes] = useState([]);
+  const [allRooms, setAllRooms] = useState([]);
 
   const [f, setF] = useState({
     checkIn: sp.get("checkIn") || "",
     checkOut: sp.get("checkOut") || "",
     capacity: sp.get("capacity") || sp.get("guests") || "",
-    type: sp.get("type") || "",
   });
 
   useEffect(() => {
-    api.rooms().then(setRooms).catch(() => {});
+    // 1. Lấy danh sách Booking
     api.bookings().then(setBookings).catch(() => {});
 
+    // 2. Lấy danh sách Loại phòng từ PocketBase
     pb.collection("room_types")
       .getFullList({ sort: "name" })
       .then((data) => setRoomTypes(data || []))
       .catch(() => {});
+
+    // 3. Lấy toàn bộ danh sách phòng thực tế
+    pb.collection("rooms")
+      .getFullList()
+      .then((data) => setAllRooms(data || []))
+      .catch(() => {});
   }, []);
 
-  const roomBusy = (roomId) => {
+  // Kiểm tra 1 phòng cụ thể có bận trong khoảng thời gian checkIn - checkOut không
+  const isRoomBusy = (room) => {
     if (!f.checkIn || !f.checkOut) return false;
-    return bookings.some(
-      (b) =>
-        b.roomCode === roomId &&
+    return bookings.some((b) => {
+      const isSameRoom =
+        b.roomId === room.id ||
+        b.room_id === room.id ||
+        b.roomCode === room.code ||
+        b.roomCode === room.id ||
+        b.expand?.roomCode?.id === room.id ||
+        b.expand?.roomCode?.code === room.code;
+
+      return (
+        isSameRoom &&
         b.status !== "cancelled" &&
         overlaps(f.checkIn, f.checkOut, b.checkIn, b.checkOut)
-    );
+      );
+    });
   };
 
-  const list = rooms
-    .filter((r) => r.status === "active")
-    .filter((r) => {
-      // 1. Lọc theo Loại phòng
-      if (!f.type || f.type === "all") return true;
-      const roomTypeObj = r.expand?.room_type_id || r.expand?.room_type;
-      const typeName = roomTypeObj?.name || r.typeName;
-      return typeName === f.type;
-    })
-    .filter((r) => {
-      // 2. Lọc theo Sức chứa
-      if (!f.capacity) return true;
-      const targetCapacity = Number(f.capacity);
-      const roomCapacity = Number(
-        r.capacity ?? r.expand?.room_type_id?.capacity ?? 0
-      );
+  // Tính toán số phòng khả dụng cho từng loại phòng
+  const getAvailableRoomsCount = (type) => {
+    const roomsInType = allRooms.filter((r) => {
+      const typeId = r.room_type_id || r.roomTypeId || r.room_type || r.type;
+      return typeId === type.id || typeId === type.name;
+    });
 
-      return roomCapacity >= targetCapacity;
-    })
-    .filter((r) => !roomBusy(r.id));
+    const availableRooms = roomsInType.filter((room) => !isRoomBusy(room));
 
-  // Hàm phụ trợ lấy URL ảnh PocketBase chuẩn
+    return {
+      availableCount: availableRooms.length,
+      totalCount: roomsInType.length,
+    };
+  };
+
+  // Lọc loại phòng thỏa mãn các điều kiện
+  const list = roomTypes
+    .map((type) => {
+      const { availableCount, totalCount } = getAvailableRoomsCount(type);
+      return { ...type, availableCount, totalCount };
+    })
+    .filter((type) => {
+      if (f.capacity) {
+        const targetCapacity = Number(f.capacity);
+        const roomCapacity = Number(type.capacity ?? 0);
+        if (roomCapacity < targetCapacity) return false;
+      }
+
+      if (f.checkIn && f.checkOut) {
+        return type.availableCount > 0;
+      }
+
+      return true;
+    });
+
   const getImageUrl = (record) => {
-    const images = Array.isArray(record.images) ? record.images : record.images ? [record.images] : [];
+    const images = Array.isArray(record.images)
+      ? record.images
+      : record.images
+      ? [record.images]
+      : [];
     if (!images.length) return "";
-    return pb.files.getURL(record, images[0]);
+    return pb.files.getUrl(record, images[0]);
   };
 
   return (
@@ -111,7 +145,7 @@ export default function RoomsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 space-y-8">
         <div className="text-center space-y-2">
           <h1 className="font-display text-3xl md:text-5xl font-extrabold tracking-tight">
-            Danh Sách Phòng
+            Danh Sách Loại Phòng
           </h1>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">
             Tìm kiếm không gian nghỉ dưỡng lý tưởng phù hợp với lịch trình của bạn
@@ -120,7 +154,6 @@ export default function RoomsPage() {
 
         <SearchBar
           initialValues={f}
-          roomTypes={roomTypes}
           onSearch={(newFilters) => {
             setF(newFilters);
             const q = new URLSearchParams();
@@ -133,19 +166,18 @@ export default function RoomsPage() {
           {list.length === 0 && (
             <div className="text-center py-16 bg-muted/20 rounded-2xl border border-dashed border-border/80">
               <p className="text-muted-foreground font-medium">
-                Không có phòng nào phù hợp với điều kiện tìm kiếm của bạn.
+                Không có loại phòng nào trống phù hợp với điều kiện tìm kiếm của bạn.
               </p>
             </div>
           )}
 
-          {list.map((r) => {
-            const roomType = r.expand?.room_type_id || r.expand?.room_type;
-            const roomPrice = roomType?.price ?? r.price ?? 0;
-            const imgUrl = getImageUrl(r);
+          {list.map((type) => {
+            const roomPrice = type.price ?? 0;
+            const imgUrl = getImageUrl(type);
 
             return (
               <Card
-                key={r.id}
+                key={type.id}
                 className="overflow-hidden border-border/60 hover:shadow-xl transition-all duration-300 grid grid-cols-1 md:grid-cols-12 md:h-[240px]"
               >
                 {/* Khung chứa ảnh */}
@@ -153,7 +185,7 @@ export default function RoomsPage() {
                   {imgUrl ? (
                     <img
                       src={imgUrl}
-                      alt={r.typeName || r.code}
+                      alt={type.name}
                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                     />
                   ) : (
@@ -161,12 +193,14 @@ export default function RoomsPage() {
                       Không có ảnh
                     </div>
                   )}
-                  <Badge
-                    variant="secondary"
-                    className="absolute top-3 left-3 font-mono text-xs shadow-md"
-                  >
-                    #{r.code}
-                  </Badge>
+                  {type.code && (
+                    <Badge
+                      variant="secondary"
+                      className="absolute top-3 left-3 font-mono text-xs shadow-md"
+                    >
+                      {type.code}
+                    </Badge>
+                  )}
                 </div>
 
                 {/* KHU VỰC NỘI DUNG */}
@@ -175,17 +209,32 @@ export default function RoomsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h3 className="font-display text-2xl font-bold tracking-tight">
-                          {r.typeName || roomType?.name || `Phòng ${r.code}`}
+                          {type.name}
                         </h3>
                         <div className="flex flex-wrap items-center gap-4 mt-1.5 text-sm text-muted-foreground">
-                          {r.area && (
-                            <span className="flex items-center gap-1.5">
-                              <Maximize className="w-4 h-4 text-primary" /> {r.area}
-                            </span>
-                          )}
                           <span className="flex items-center gap-1.5">
-                            <BedDouble className="w-4 h-4 text-primary" /> {r.beds ? `${r.beds} phòng ngủ` : "1 phòng ngủ"}
+                            <Users className="w-4 h-4 text-primary" />
+                            {type.capacity ? `${type.capacity} người` : "2 người"}
                           </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1.5">
+                            <BedDouble className="w-4 h-4 text-primary" />
+                            {type.beds ? `${type.beds} giường` : "1 giường"}
+                          </span>
+                          
+                          {/* Chỉ hiển thị số phòng còn trống khi người dùng lọc theo checkIn & checkOut */}
+                          {f.checkIn && f.checkOut && (
+                            <>
+                              <span>•</span>
+                              <Badge
+                                variant="outline"
+                                className="bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold gap-1 text-xs"
+                              >
+                                <DoorClosed className="w-3.5 h-3.5" />
+                                Còn {type.availableCount} phòng trống
+                              </Badge>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -194,13 +243,13 @@ export default function RoomsPage() {
                           {fmt(roomPrice)}
                         </span>
                         <span className="text-xs text-muted-foreground block font-normal">
-                          / Ngày
+                          / Đêm
                         </span>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {(r.amenities || []).slice(0, 5).map((a) => (
+                      {(type.amenities || []).slice(0, 5).map((a) => (
                         <Badge
                           key={a}
                           variant="outline"
@@ -215,7 +264,15 @@ export default function RoomsPage() {
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-border/40 sm:justify-end">
                     <Button
-                      onClick={() => nav("/rooms/" + r.id)}
+                      onClick={() => {
+                        const q = new URLSearchParams();
+                        if (f.checkIn) q.set("checkIn", f.checkIn);
+                        if (f.checkOut) q.set("checkOut", f.checkOut);
+                        if (f.capacity) q.set("capacity", f.capacity);
+
+                        const queryString = q.toString();
+                        nav(`/rooms/${type.id}${queryString ? `?${queryString}` : ""}`);
+                      }}
                       className="rounded-full font-semibold px-6 shadow-sm bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       Xem chi tiết

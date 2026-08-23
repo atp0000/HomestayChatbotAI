@@ -183,24 +183,29 @@ export default function ReceptionPage() {
     (_, i) => new Date(minDate.getTime() + i * 86400000)
   );
 
-  const handleOpenWalkIn = (fromRoomCode = "") => {
+  const handleOpenWalkIn = (fromRoomCode = "", initCheckIn = "", initCheckOut = "") => {
     setFormErr("");
-    const defaultRoom = fromRoomCode || "";
-    const tomorrowStr = new Date(Date.now() + 86400000)
-      .toISOString()
-      .split("T")[0];
 
+    // Tìm phòng chuẩn theo id hoặc code
+    const matchedRoom = rooms.find(
+      (r) => r.id === fromRoomCode || r.code === fromRoomCode
+    );
+
+    // Ưu tiên lấy r.id để khớp với value của ô Select
+    const targetRoomId = matchedRoom ? matchedRoom.id : fromRoomCode;
+
+    // Khóa ô chọn phòng nếu được gọi trực tiếp từ Timeline/Grid
     setIsRoomLocked(!!fromRoomCode);
 
     setFormData({
-      roomCode: defaultRoom,
+      roomCode: targetRoomId,       // Gán ID phòng
       guestName: "",
       guestPhone: "",
       guestEmail: "",
       guestAddress: "",
       note: "",
-      checkIn: "",
-      checkOut: "",
+      checkIn: initCheckIn || "",   // Gán ngày Check-in
+      checkOut: initCheckOut || "", // Gán ngày Check-out
       guests: 1,
       status: "checkedin",
       payStatus: "unpaid",
@@ -262,6 +267,7 @@ export default function ReceptionPage() {
         code: genCode(),
         roomCode: room.id,          // Lưu Record ID của phòng (Relation)
         roomTypeName: roomTypeId,   // Lưu Record ID của loại phòng (Relation)
+        customer: pb.authStore.record?.id, //luu id cua tài khoản 
         guestName: formData.guestName,
         guestPhone: formData.guestPhone,
         guestEmail:
@@ -311,10 +317,14 @@ export default function ReceptionPage() {
   const calcNights = nights(formData.checkIn, formData.checkOut);
   const calcTotal = currentRoomPrice * Math.max(0, calcNights);
 
-  const handleDateChange = ({ checkIn, checkOut }) => {
-    setFormData((prev) => ({ ...prev, checkIn, checkOut }));
-  };
-
+  // Hàm cập nhật ngày khi có sự thay đổi từ DateRangePicker
+const handleDateChange = ({ checkIn, checkOut }) => {
+  setFormData((prev) => ({
+    ...prev,
+    checkIn: checkIn ?? prev.checkIn,
+    checkOut: checkOut ?? prev.checkOut,
+  }));
+};
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* HEADER RIÊNG CHO LỄ TÂN */}
@@ -391,6 +401,7 @@ export default function ReceptionPage() {
             days={days}
             roomBookings={roomBookings}
             onSelectBooking={setSel}
+            onCreateWalkIn={handleOpenWalkIn}
           />
         )}
       </div>

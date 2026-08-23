@@ -13,6 +13,7 @@ import {
   CreditCard,
   Hash,
   Loader2,
+  MapPin,
 } from "lucide-react";
 
 // shadcn/ui components
@@ -57,7 +58,11 @@ export default function SuccessPage() {
   const P = ({ label, value, highlight = false }) => (
     <div>
       <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      <p className={`font-semibold text-sm ${highlight ? "text-primary font-bold" : "text-foreground"}`}>
+      <p
+        className={`font-semibold text-sm ${
+          highlight ? "text-primary font-bold" : "text-foreground"
+        }`}
+      >
         {value || "—"}
       </p>
     </div>
@@ -68,16 +73,22 @@ export default function SuccessPage() {
       ? "Chuyển khoản (100%)"
       : "Thanh toán khi nhận phòng";
 
-  // Trích xuất thông tin Tên phòng và Loại phòng từ Relation Expand hoặc Field gốc
+  // Trích xuất thông tin Tên phòng, Vị trí phòng và Loại phòng từ Relation Expand
   const displayRoomCode = b.expand?.roomCode?.code || b.roomCode;
   const displayRoomType = b.expand?.roomTypeName?.name || b.roomTypeName;
+  const displayRoomArea = b.expand?.roomCode?.area || b.area || "Chưa xác định";
 
   return (
     <div className="min-h-screen bg-muted/30 pb-12">
       {/* THANH ĐIỀU HƯỚNG TRÊN CÙNG (Ẩn khi in hóa đơn) */}
       <div className="bg-primary text-primary-foreground py-3 px-6 flex justify-between items-center shadow-sm print:hidden">
         <span className="font-bold text-sm tracking-wide">Núi Homestay</span>
-        <Button variant="outline" size="sm" asChild className="bg-transparent border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+        <Button
+          variant="outline"
+          size="sm"
+          asChild
+          className="bg-transparent border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+        >
           <Link to="/" className="flex items-center gap-2">
             <Home className="w-4 h-4" /> Trang chủ
           </Link>
@@ -138,13 +149,21 @@ export default function SuccessPage() {
                   <Calendar className="w-4 h-4" /> Chi tiết lưu trú
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
-                  <P label="Tên phòng" value={displayRoomCode} />
-                  <P label="Loại phòng" value={displayRoomType} />
-                  <P label="Ngày nhận" value={fmtDate(b.checkIn)} />
-                  <P label="Ngày trả" value={fmtDate(b.checkOut)} />
-                  <P label="Số lượng khách" value={`${b.guests} người`} />
-                  <P label="Số đêm lưu trú" value={`${b.nights} Ngày`} />
-                </div>
+  <P label="Tên phòng" value={displayRoomCode} />
+  <P label="Loại phòng" value={displayRoomType} />
+  
+  <P label="Vị trí phòng" value={displayRoomArea}  />
+  <P label="Số lượng khách" value={`${b.guests} người`} />
+  
+  <P label="Ngày nhận" value={fmtDate(b.checkIn)} />
+  <P label="Ngày trả" value={fmtDate(b.checkOut)} />
+
+  {/* Cho mục Số đêm lưu trú tràn hết chiều rộng 2 cột ở hàng cuối */}
+  <div className="col-span-2 bg-muted/40 p-2.5 rounded-lg border border-border/50 flex justify-between items-center">
+    <span className="text-xs text-muted-foreground font-medium">Tổng thời gian lưu trú</span>
+    <span className="font-bold text-sm text-primary">{b.nights} Ngày</span>
+  </div>
+</div>
               </div>
 
               {/* CỘT 2: CHI TIẾT THANH TOÁN */}

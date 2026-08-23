@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SiteLayout from "@/components/layout/SiteLayout";
 import SearchBar from "@/components/common/SearchBar";
-import { api, fmt } from "@/lib/store";
+import { fmt } from "@/lib/store";
 import pb from "@/lib/pocketbaseClient";
 import { ABOUT_IMAGES } from "@/assets/aboutImages";
 import background from "@/assets/background.jpg";
@@ -18,6 +18,8 @@ import {
   Phone,
   Mail,
   ChevronLeft,
+  Users,
+  Bed,
 } from "lucide-react";
 
 // shadcn/ui components
@@ -33,21 +35,20 @@ import { Badge } from "@/components/ui/badge";
 
 export default function HomePage() {
   const nav = useNavigate();
-  const [rooms, setRooms] = useState([]);
+  const [featuredTypes, setFeaturedTypes] = useState([]);
   const [roomTypes, setRoomTypes] = useState([]);
   const [currentImgIdx, setCurrentImgIdx] = useState(0);
 
   useEffect(() => {
-    // 1. Lấy danh sách 3 phòng nổi bật
-    api
-      .rooms()
-      .then((r) => setRooms((r || []).slice(0, 3)))
-      .catch(() => {});
-
-    // 2. Lấy danh sách Loại phòng từ PocketBase
+    // Lấy danh sách Loại phòng từ PocketBase
     pb.collection("room_types")
       .getFullList({ sort: "name" })
-      .then((data) => setRoomTypes(data || []))
+      .then((data) => {
+        const list = data || [];
+        setRoomTypes(list);
+        // Hiển thị 3 loại phòng nổi bật đầu tiên
+        setFeaturedTypes(list.slice(0, 3));
+      })
       .catch(() => {});
   }, []);
 
@@ -59,7 +60,7 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, []);
 
-  // Hàm tạo URL ảnh chuẩn PocketBase
+  // Hàm lấy URL ảnh từ PocketBase
   const getImageUrl = (record) => {
     const images = Array.isArray(record.images)
       ? record.images
@@ -68,7 +69,7 @@ export default function HomePage() {
       : [];
     if (!images.length)
       return "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1000";
-    return pb.files.getURL(record, images[0]);
+    return pb.files.getUrl(record, images[0]);
   };
 
   const amenities = [
@@ -92,8 +93,8 @@ export default function HomePage() {
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-  backgroundImage: `url(${background})`,
-}}
+            backgroundImage: `url(${background})`,
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
 
@@ -126,7 +127,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* PHÒNG NỔI BẬT */}
+      {/* PHÒNG NỔI BẬT (HIỂN THỊ TỪ ROOM_TYPES) */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
         <div className="flex items-end justify-between mb-8">
           <div>
@@ -147,38 +148,47 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {rooms.map((r) => {
-            const typeInfo = r.expand?.room_type_id || r.expand?.room_type;
-            const roomPrice = typeInfo?.price ?? r.price ?? 0;
-            const roomImage = getImageUrl(r);
+          {featuredTypes.map((type) => {
+            const roomPrice = type.price ?? 0;
+            const roomImage = getImageUrl(type);
 
             return (
               <Card
-                key={r.id}
-                className="group overflow-hidden border-border/60 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+                key={type.id}
+                className="group overflow-hidden border-border/60 hover:shadow-xl transition-all duration-300 flex flex-col justify-between cursor-pointer"
+                onClick={() => nav(`/rooms/${type.id}`)}
               >
                 <div>
-                  {/* 🟢 SỬA THÀNH THẺ <img> CÓ RỘNG/CAO CỐ ĐỊNH TỈ LỆ */}
                   <div className="relative h-56 overflow-hidden bg-muted">
                     <img
                       src={roomImage}
-                      alt={typeInfo?.name || r.code}
+                      alt={type.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <Badge
-                      className="absolute top-3 right-3 font-mono shadow-md"
-                      variant="secondary"
-                    >
-                      #{r.code}
-                    </Badge>
+                    {type.code && (
+                      <Badge
+                        className="absolute top-3 right-3 font-mono shadow-md"
+                        variant="secondary"
+                      >
+                        {type.code}
+                      </Badge>
+                    )}
                   </div>
 
                   <CardHeader className="pb-2">
                     <CardTitle className="text-xl font-bold flex justify-between items-center">
-                      {typeInfo?.name || "Chưa phân loại"}
+                      {type.name}
                     </CardTitle>
-                    <CardDescription className="text-sm">
-                      {r.beds ? `${r.beds} phòng ngủ` : "Giường đôi"}
+                    <CardDescription className="text-sm flex items-center gap-3 pt-1">
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                        {type.capacity ? `${type.capacity} người` : "2 người"}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Bed className="w-3.5 h-3.5 text-muted-foreground" />
+                        {type.beds ? `${type.beds} giường` : "1 giường"}
+                      </span>
                     </CardDescription>
                   </CardHeader>
                 </div>
@@ -189,12 +199,15 @@ export default function HomePage() {
                       {fmt(roomPrice)}
                     </span>
                     <span className="text-xs text-muted-foreground font-normal">
-                      / Ngày
+                      / Đêm
                     </span>
                   </div>
 
                   <Button
-                    onClick={() => nav("/rooms/" + r.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nav(`/rooms/${type.id}`);
+                    }}
                     className="w-full font-semibold rounded-full"
                   >
                     Xem chi tiết
@@ -327,7 +340,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex items-start gap-3 text-muted-foreground">
                   <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                  <span> 2 Ngự Bình, An Cụ, Thành phố Huế</span>
+                  <span> 2 Ngự Bình, An Cựu, Thành phố Huế</span>
                 </div>
               </div>
             </div>

@@ -108,48 +108,45 @@ export default function WalkInBookingModal({
 
             <div className="grid grid-cols-12 gap-3">
               {/* Chọn Phòng */}
-              <div className="col-span-6 space-y-1">
-                <Label className="text-xs">
-                  Chọn phòng *{" "}
-                  {isRoomLocked && (
-                    <span className="text-[10px] text-muted-foreground font-normal">
-                      (Cố định)
-                    </span>
-                  )}
-                </Label>
-                <Select
-                  disabled={isRoomLocked}
-                  value={formData.roomCode}
-                  onValueChange={(val) =>
-                    setFormData({ ...formData, roomCode: val })
-                  }
-                >
-                  <SelectTrigger className="h-9 text-xs font-semibold">
-                    <SelectValue placeholder="Chọn phòng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rooms.map((r) => {
-                      const roomType =
-                        r.expand?.room_type_id ||
-                        r.expand?.room_type ||
-                        r.expand?.roomType;
-                      const p = roomType?.price ?? r.price ?? 0;
-                      const typeName =
-                        roomType?.name ?? r.typeName ?? "Phòng";
+              {/* Chọn Phòng */}
+<div className="col-span-6 space-y-1">
+  <Label className="text-xs">
+    Chọn phòng *{" "}
+    {isRoomLocked }
+  </Label>
+  <Select
+    disabled={isRoomLocked}
+    value={formData.roomCode || ""}
+    onValueChange={(val) =>
+      setFormData({ ...formData, roomCode: val })
+    }
+  >
+    <SelectTrigger 
+      className={`h-9 text-xs font-semibold ${
+        isRoomLocked ? "[&>svg]:hidden pointer-events-none bg-muted/50" : ""
+      }`}
+    >
+      <SelectValue placeholder="Chọn phòng" />
+    </SelectTrigger>
+    <SelectContent>
+      {rooms.map((r) => {
+        const roomType =
+          r.expand?.room_type_id ||
+          r.expand?.room_type ||
+          r.expand?.roomType;
+        const p = roomType?.price ?? r.price ?? 0;
+        const typeName =
+          roomType?.name ?? r.typeName ?? "Phòng";
 
-                      return (
-                        <SelectItem
-                          key={r.id}
-                          value={r.id}
-                          className="text-xs"
-                        >
-                          Phòng {r.code} ({typeName}) - {fmt(p)}đ
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
+        return (
+          <SelectItem key={r.id} value={r.id} className="text-xs">
+            Phòng {r.code} ({typeName}) - {fmt(p)}đ
+          </SelectItem>
+        );
+      })}
+    </SelectContent>
+  </Select>
+</div>
 
 
               {/* Tái sử dụng DateRangePicker cho Chọn Ngày */}
