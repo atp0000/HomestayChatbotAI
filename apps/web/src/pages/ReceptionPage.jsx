@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import pb from "@/lib/pocketbaseClient";
 import { useAuth } from "@/lib/AuthContext";
@@ -10,18 +10,29 @@ import ReceptionGridView from "@/components/reception/ReceptionGridView";
 import ReceptionTimelineView from "@/components/reception/ReceptionTimelineView";
 import BookingDetailDialog from "@/components/reception/BookingDetailDialog";
 import WalkInBookingModal from "@/components/reception/WalkInBookingModal";
+import ReceptionSupportTab from "@/components/reception/ReceptionSupportTab"; 
+
+// Component hiển thị dạng Bảng
+import BookingTable from "@/components/admin/BookingTable";
 
 // shadcn/ui & Icons
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, List, LogOut, UserPlus, Palmtree } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { LayoutGrid, List, LogOut, UserPlus, Palmtree, HelpCircle, Table as TableIcon, Search } from "lucide-react";
 
 export default function ReceptionPage() {
   const { logout } = useAuth();
   const nav = useNavigate();
+  
+  // State điều khiển View chính: 'grid' | 'timeline' | 'table' | 'support'
   const [view, setView] = useState("grid");
+  
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [sel, setSel] = useState(null);
+
+  // State tìm kiếm cho danh sách dạng Bảng
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [showWalkInModal, setShowWalkInModal] = useState(false);
   const [isRoomLocked, setIsRoomLocked] = useState(false);
@@ -43,12 +54,25 @@ export default function ReceptionPage() {
     payMethod: "cash",
   });
 
-  // 🟢 Lấy danh sách rooms và bookings hỗ trợ Expand Relation
+  // Lọc danh sách booking theo từ khóa tìm kiếm (Mã đặt phòng hoặc Tên khách)
+  const filteredBookings = useMemo(() => {
+    const keyword = searchTerm.trim().toLowerCase();
+    if (!keyword) return bookings;
+
+    return bookings.filter((b) => {
+      const codeMatch = b.code?.toLowerCase().includes(keyword);
+      const nameMatch = b.guestName?.toLowerCase().includes(keyword);
+      const phoneMatch = b.guestPhone?.toLowerCase().includes(keyword);
+      return codeMatch || nameMatch || phoneMatch;
+    });
+  }, [bookings, searchTerm]);
+
+  // Lấy danh sách rooms và bookings
   const load = async () => {
     try {
       const [roomsData, bookingsData] = await Promise.all([
         pb.collection("rooms").getFullList({ expand: "room_type_id,room_type,roomType" }),
-        pb.collection("bookings").getFullList({ expand: "roomCode,roomTypeName,room_type_id" }),
+        pb.collection("bookings").getFullList({ expand: "roomCode,roomTypeName,room_type_id,customer", sort: "-created" }),
       ]);
       setRooms(roomsData);
       setBookings(bookingsData);
@@ -85,11 +109,36 @@ export default function ReceptionPage() {
     nav("/auth", { replace: true });
   };
 
-  const todayStr = new Date().toISOString().split("T")[0];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 🟢 Hàm kiểm tra trạng thái phòng tương thích với Relation (ID / Object / Code)
+  // Cập nhật trạng thái đơn đặt phòng
+  const updateStatus = async (target, newStatus) => {
+    try {
+      const bookingId = typeof target === "object" ? target.id : target;
+      const updateData = { status: newStatus };
+      if (newStatus === "checkedout") {
+        updateData.payStatus = "paid";
+      }
+      await pb.collection("bookings").update(bookingId, updateData);
+      load();
+      setSel(null);
+    } catch (err) {
+      alert("Cập nhật thất bại: " + err.message);
+    }
+  };
+
+  const handleDeleteBooking = async (collectionName, id) => {
+    if (confirm("Bạn có chắc chắn muốn xóa đơn đặt phòng này?")) {
+      try {
+        await pb.collection(collectionName).delete(id);
+        load();
+      } catch (err) {
+        alert("Xóa thất bại: " + err.message);
+      }
+    }
+  };
+
   const roomState = (code) => {
     const room = rooms.find((r) => r.code === code || r.id === code);
     const roomId = room?.id;
@@ -119,7 +168,6 @@ export default function ReceptionPage() {
     return { s: "empty", b: null };
   };
 
-  // 🟢 Lấy danh sách đơn đặt của từng phòng tương thích Relation
   const roomBookings = (code) => {
     const room = rooms.find((r) => r.code === code || r.id === code);
     const roomId = room?.id;
@@ -139,20 +187,6 @@ export default function ReceptionPage() {
     });
   };
 
-  const updateStatus = async (b, newStatus) => {
-    try {
-      const updateData = { status: newStatus };
-      if (newStatus === "checkedout") {
-        updateData.payStatus = "paid";
-      }
-      await pb.collection("bookings").update(b.id, updateData);
-      load();
-      setSel(null);
-    } catch (err) {
-      alert("Cập nhật thất bại: " + err.message);
-    }
-  };
-
   let minDate = new Date(today);
   let maxDate = new Date(today);
   maxDate.setDate(maxDate.getDate() + 7);
@@ -164,12 +198,8 @@ export default function ReceptionPage() {
       const inD = new Date(checkInParts[0], checkInParts[1] - 1, checkInParts[2], 0, 0, 0, 0);
       const outD = new Date(checkOutParts[0], checkOutParts[1] - 1, checkOutParts[2], 0, 0, 0, 0);
 
-      if (inD < minDate) {
-        minDate = inD;
-      }
-      if (outD > maxDate) {
-        maxDate = outD;
-      }
+      if (inD < minDate) minDate = inD;
+      if (outD > maxDate) maxDate = outD;
     }
   });
 
@@ -185,27 +215,19 @@ export default function ReceptionPage() {
 
   const handleOpenWalkIn = (fromRoomCode = "", initCheckIn = "", initCheckOut = "") => {
     setFormErr("");
-
-    // Tìm phòng chuẩn theo id hoặc code
-    const matchedRoom = rooms.find(
-      (r) => r.id === fromRoomCode || r.code === fromRoomCode
-    );
-
-    // Ưu tiên lấy r.id để khớp với value của ô Select
+    const matchedRoom = rooms.find((r) => r.id === fromRoomCode || r.code === fromRoomCode);
     const targetRoomId = matchedRoom ? matchedRoom.id : fromRoomCode;
 
-    // Khóa ô chọn phòng nếu được gọi trực tiếp từ Timeline/Grid
     setIsRoomLocked(!!fromRoomCode);
-
     setFormData({
-      roomCode: targetRoomId,       // Gán ID phòng
+      roomCode: targetRoomId,
       guestName: "",
       guestPhone: "",
       guestEmail: "",
       guestAddress: "",
       note: "",
-      checkIn: initCheckIn || "",   // Gán ngày Check-in
-      checkOut: initCheckOut || "", // Gán ngày Check-out
+      checkIn: initCheckIn || "",
+      checkOut: initCheckOut || "",
       guests: 1,
       status: "checkedin",
       payStatus: "unpaid",
@@ -219,16 +241,11 @@ export default function ReceptionPage() {
     if (!guestName.trim() || !guestPhone.trim()) {
       return "Vui lòng nhập đầy đủ Họ tên và Số điện thoại khách hàng.";
     }
-    if (!roomCode) {
-      return "Vui lòng chọn phòng trước khi đặt.";
-    }
-    if (!checkIn || !checkOut) {
-      return "Vui lòng chọn ngày nhận và ngày trả.";
-    }
+    if (!roomCode) return "Vui lòng chọn phòng trước khi đặt.";
+    if (!checkIn || !checkOut) return "Vui lòng chọn ngày nhận và ngày trả.";
     return null;
   };
 
-  // 🟢 Lưu phòng & loại phòng dạng Relation (Truyền Record ID)
   const handleCreateWalkInBooking = async (e) => {
     e.preventDefault();
     setFormErr("");
@@ -241,18 +258,11 @@ export default function ReceptionPage() {
 
     setSaving(true);
     try {
-      const room = rooms.find(
-        (r) => r.code === formData.roomCode || r.id === formData.roomCode
-      );
+      const room = rooms.find((r) => r.code === formData.roomCode || r.id === formData.roomCode);
       if (!room) throw new Error("Không tìm thấy thông tin phòng đã chọn.");
 
-      // Lấy Object loại phòng tương ứng
-      const roomTypeObj =
-        room.expand?.room_type_id || room.expand?.room_type || room.expand?.roomType;
-      
+      const roomTypeObj = room.expand?.room_type_id || room.expand?.room_type || room.expand?.roomType;
       const roomPrice = roomTypeObj?.price ?? room.price ?? 0;
-
-      // 🟢 LẤY ĐÚNG ID CỦA RECORD LOẠI PHÒNG (Relation ID)
       const roomTypeId = roomTypeObj?.id || room.room_type_id || room.roomType;
 
       const n = nights(formData.checkIn, formData.checkOut);
@@ -262,16 +272,14 @@ export default function ReceptionPage() {
       checkInDate.setHours(0, 0, 0, 0);
       const effectiveStatus = checkInDate <= today ? "checkedin" : "pending";
 
-      // 🟢 ĐÃ SỬA: bỏ payMethod khỏi bookings (field này đã chuyển sang collection "payments")
       const recordData = {
         code: genCode(),
-        roomCode: room.id,          // Lưu Record ID của phòng (Relation)
-        roomTypeName: roomTypeId,   // Lưu Record ID của loại phòng (Relation)
-        customer: pb.authStore.record?.id, //luu id cua tài khoản 
+        roomCode: room.id,
+        roomTypeName: roomTypeId,
+        customer: pb.authStore.record?.id,
         guestName: formData.guestName,
         guestPhone: formData.guestPhone,
-        guestEmail:
-          formData.guestEmail || `${formData.guestPhone}@homestay.local`,
+        guestEmail: formData.guestEmail || `${formData.guestPhone}@homestay.local`,
         guestAddress: formData.guestAddress || "Tại quầy Lễ tân",
         note: formData.note,
         guests: Number(formData.guests) || 1,
@@ -288,7 +296,6 @@ export default function ReceptionPage() {
 
       const createdBooking = await pb.collection("bookings").create(recordData);
 
-      // 🟢 MỚI: tạo record payments tương ứng, thay cho payMethod đã xóa khỏi bookings
       await createPayment({
         booking: createdBooking.id,
         amount: total,
@@ -306,30 +313,28 @@ export default function ReceptionPage() {
     }
   };
 
-  const selectedRoom = rooms.find(
-    (r) => r.code === formData.roomCode || r.id === formData.roomCode
-  );
-  const roomTypeObj =
-    selectedRoom?.expand?.room_type_id ||
-    selectedRoom?.expand?.room_type ||
-    selectedRoom?.expand?.roomType;
+  const selectedRoom = rooms.find((r) => r.code === formData.roomCode || r.id === formData.roomCode);
+  const roomTypeObj = selectedRoom?.expand?.room_type_id || selectedRoom?.expand?.room_type || selectedRoom?.expand?.roomType;
   const currentRoomPrice = roomTypeObj?.price ?? selectedRoom?.price ?? 0;
   const calcNights = nights(formData.checkIn, formData.checkOut);
   const calcTotal = currentRoomPrice * Math.max(0, calcNights);
 
-  // Hàm cập nhật ngày khi có sự thay đổi từ DateRangePicker
-const handleDateChange = ({ checkIn, checkOut }) => {
-  setFormData((prev) => ({
-    ...prev,
-    checkIn: checkIn ?? prev.checkIn,
-    checkOut: checkOut ?? prev.checkOut,
-  }));
-};
+  const handleDateChange = ({ checkIn, checkOut }) => {
+    setFormData((prev) => ({
+      ...prev,
+      checkIn: checkIn ?? prev.checkIn,
+      checkOut: checkOut ?? prev.checkOut,
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* HEADER RIÊNG CHO LỄ TÂN */}
+      {/* HEADER */}
       <header className="bg-primary text-primary-foreground px-5 h-14 flex items-center justify-between shadow-md">
-        <div className="flex items-center gap-2 font-extrabold text-lg">
+        <div 
+          className="flex items-center gap-2 font-extrabold text-lg cursor-pointer"
+          onClick={() => setView("grid")}
+        >
           <Palmtree className="w-5 h-5 text-amber-400" />
           <span>Núi Homestay · Lễ tân</span>
         </div>
@@ -342,9 +347,22 @@ const handleDateChange = ({ checkIn, checkOut }) => {
             <UserPlus className="w-4 h-4" />+ Đặt phòng trực tiếp
           </Button>
 
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setView("support")}
+            className={`h-8 gap-1.5 font-semibold text-xs transition-all ${
+              view === "support"
+                ? "bg-white/25 text-white shadow-sm"
+                : "text-primary-foreground hover:bg-white/20 hover:text-white"
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-amber-300" />
+            <span>Giải đáp</span>
+          </Button>
+
           <div className="h-6 w-[1px] bg-primary-foreground/20 mx-1"></div>
 
-          {/* Nút Xem dạng Lưới (Grid) */}
           <Button
             variant="ghost"
             size="icon"
@@ -354,11 +372,11 @@ const handleDateChange = ({ checkIn, checkOut }) => {
                 ? "bg-white/25 text-white font-bold shadow-sm"
                 : "text-white/80 hover:bg-white/15 hover:text-white"
             }`}
+            title="Sơ đồ phòng (Dạng Lưới)"
           >
             <LayoutGrid className="w-5 h-5" />
           </Button>
 
-          {/* Nút Xem dạng Danh sách/Thời gian (Timeline) */}
           <Button
             variant="ghost"
             size="icon"
@@ -368,8 +386,23 @@ const handleDateChange = ({ checkIn, checkOut }) => {
                 ? "bg-white/25 text-white font-bold shadow-sm"
                 : "text-white/80 hover:bg-white/15 hover:text-white"
             }`}
+            title="Dòng thời gian (Timeline)"
           >
             <List className="w-5 h-5" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setView("table")}
+            className={`h-9 w-9 transition-all ${
+              view === "table"
+                ? "bg-white/25 text-white font-bold shadow-sm"
+                : "text-white/80 hover:bg-white/15 hover:text-white"
+            }`}
+            title="Danh sách đặt phòng (Dạng Bảng)"
+          >
+            <TableIcon className="w-5 h-5" />
           </Button>
 
           <Button
@@ -385,25 +418,64 @@ const handleDateChange = ({ checkIn, checkOut }) => {
         </div>
       </header>
 
+      {/* BODY CONTENT */}
       <div className="max-w-[80rem] mx-auto px-5 py-6">
-        <StatusLegend />
-
-        {view === "grid" ? (
-          <ReceptionGridView
-            rooms={rooms}
-            roomState={roomState}
-            onSelectBooking={setSel}
-            onCreateWalkIn={handleOpenWalkIn}
-          />
-        ) : (
-          <ReceptionTimelineView
-            rooms={rooms}
-            days={days}
-            roomBookings={roomBookings}
-            onSelectBooking={setSel}
-            onCreateWalkIn={handleOpenWalkIn}
-          />
+        {view === "grid" && (
+          <>
+            <StatusLegend />
+            <ReceptionGridView
+              rooms={rooms}
+              roomState={roomState}
+              onSelectBooking={setSel}
+              onCreateWalkIn={handleOpenWalkIn}
+            />
+          </>
         )}
+
+        {view === "timeline" && (
+          <>
+            <StatusLegend />
+            <ReceptionTimelineView
+              rooms={rooms}
+              days={days}
+              roomBookings={roomBookings}
+              onSelectBooking={setSel}
+              onCreateWalkIn={handleOpenWalkIn}
+            />
+          </>
+        )}
+
+        {/* HIỂN THỊ DẠNG BẢNG & THANH TÌM KIẾM */}
+       
+        {view === "table" && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+              <h2 className="text-xl font-bold text-foreground">
+                Tất cả đơn đặt phòng
+              </h2>
+
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Tìm theo mã booking hoặc tên khách..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 pr-4 h-9 text-xs rounded-full border-gray-300 focus-visible:ring-1"
+                />
+              </div>
+            </div>
+
+            <BookingTable
+              bookings={filteredBookings}
+              setStatus={updateStatus}
+              del={handleDeleteBooking}
+              editableStatus={true}
+            />
+          </div>
+        )}
+
+        {view === "support" && <ReceptionSupportTab />}
       </div>
 
       <BookingDetailDialog

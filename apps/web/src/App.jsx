@@ -13,6 +13,7 @@ import HistoryPage from './pages/HistoryPage';
 import AuthPage from './pages/AuthPage';
 import AdminPage from './pages/AdminPage';
 import ReceptionPage from './pages/ReceptionPage';
+import SupportPage from './pages/SupportPage';
 
 function App() {
   return (
@@ -36,9 +37,13 @@ function App() {
             <Route path="/lien-he" element={<HomePage />} />
           </Route>
 
-          {/* 3. Nhóm các trang dành cho Nội bộ */}
+          {/* 3. Trang Gửi Hỗ Trợ (Cho phép mọi tài khoản truy cập) */}
+          <Route path="/ho-tro" element={<SupportPage />} />
+
+          {/* 4. Nhóm các trang dành cho Nội bộ */}
           <Route path="/admin" element={<RequireRole allowedRoles={['admin']}><AdminPage /></RequireRole>} />
           <Route path="/reception" element={<RequireRole allowedRoles={['receptionist']}><ReceptionPage /></RequireRole>} />
+         
         </Routes>
       </Router>
     </AuthProvider>

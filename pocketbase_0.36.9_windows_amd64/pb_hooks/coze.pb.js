@@ -13,7 +13,7 @@ routerAdd("POST", "/api/coze/chat", (e) => {
     // ==== CẤU HÌNH ====
     const COZE_BOT_ID = "7670933824876085253";
     const COZE_API_TOKEN = "pat_ymPCXHtjs57UiGQW3sVhI07jkLtUfoaCQUDXehBtVP6OgFhtAhOjXmhW9qgXKnGA";
-    const COZE_API_BASE = "https://api.coze.com"; // đổi thành .cn nếu token tạo bên coze.cn
+    const COZE_API_BASE = "https://api.coze.com"; 
     // ===================
 
     const info = e.requestInfo();

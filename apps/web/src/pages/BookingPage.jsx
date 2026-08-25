@@ -101,36 +101,33 @@ export default function BookingPage() {
   });
 
   const submitCash = async () => {
-    setErr("");
-    if (!isFormValid) {
-      return setErr("Vui lòng điền đầy đủ các trường bắt buộc (*).");
-    }
-    setSaving(true);
-    try {
-      await applyServiceQuantityDelta(
-        svcDetail.map((item) => ({ serviceId: item.serviceId, count: item.count }))
-      );
+  setErr("");
+  if (!isFormValid) {
+    return setErr("Vui lòng điền đầy đủ các trường bắt buộc (*).");
+  }
+  setSaving(true);
+  try {
+    await applyServiceQuantityDelta(
+      svcDetail.map((item) => ({ serviceId: item.serviceId, count: item.count }))
+    );
 
-      const rec = await pb.collection("bookings").create({
-        ...getBookingPayload(),
-        payStatus: "unpaid",
-        status: "pending",
-      });
+    const res = await pb.send("/api/create-booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...getBookingPayload(), method: "cash" }),
+    });
 
-      await createPayment({
-        booking: rec.id,
-        amount: total,
-        method: "cash",
-        status: "pending",
-      });
-
-      nav("/success/" + rec.id, { replace: true });
-    } catch (e) {
+    nav("/success/" + res.booking.id, { replace: true });
+  } catch (e) {
+    if (e?.status === 409) {
+      setErr(e?.response?.message || "Phòng vừa được người khác đặt, vui lòng chọn phòng/ngày khác.");
+    } else {
       setErr("Đặt phòng thất bại. Vui lòng kiểm tra lại kết nối.");
-    } finally {
-      setSaving(false);
     }
-  };
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <SiteLayout>

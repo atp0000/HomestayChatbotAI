@@ -1,11 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
-import { Palmtree, User, LogOut, History, LayoutDashboard, CalendarDays } from "lucide-react";
-import Chatbot from "@/components/Chatbot";
+import { 
+  Palmtree, 
+  User, 
+  LogOut, 
+  History, 
+  LayoutDashboard, 
+  CalendarDays, 
+  HelpCircle,
+  LayoutGrid, // Icon hiển thị dạng lưới
+  ListFilter   // Icon hiển thị dạng danh sách
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +28,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 
-function Header() {
+function Header({ viewMode, setViewMode }) {
   const { isAuthed, user, role, logout } = useAuth();
   const nav = useNavigate();
 
@@ -42,7 +49,7 @@ function Header() {
           <span>Núi Homestay</span>
         </Link>
 
-        {/* Desktop Navigation - Dùng NavigationMenu của shadcn */}
+        {/* Desktop Navigation */}
         <NavigationMenu>
           <NavigationMenuList>
             {items.map((i) => (
@@ -57,6 +64,24 @@ function Header() {
 
         {/* User / Action Buttons */}
         <div className="flex items-center gap-2">
+          
+          {/* 🟢 Nút Icon chuyển đổi Chế độ xem (Lưới / Bảng) giống ảnh */}
+          {setViewMode && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 rounded-lg"
+              title={viewMode === "table" ? "Chuyển sang dạng Lưới" : "Chuyển sang dạng Bảng"}
+              onClick={() => setViewMode(viewMode === "table" ? "grid" : "table")}
+            >
+              {viewMode === "table" ? (
+                <LayoutGrid className="h-4 w-4" />
+              ) : (
+                <ListFilter className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+
           {role === "admin" && (
             <Button variant="secondary" size="sm" asChild>
               <Link to="/admin">
@@ -77,26 +102,36 @@ function Header() {
 
           {isAuthed ? (
             <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-  <Button 
-    variant="ghost" 
-    className="px-4 py-2 rounded-full font-medium flex items-center gap-2 max-w-[200px]"
-  >
-    <span className="truncate">
-      {user?.fullName}
-    </span>
-  </Button>
-</DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="px-4 py-2 rounded-full font-medium flex items-center gap-2 max-w-[200px]"
+                >
+                  <span className="truncate">
+                    {user?.fullName}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel> Tài khoản</DropdownMenuLabel>
+                <DropdownMenuLabel>Tài khoản</DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                
                 <DropdownMenuItem asChild>
                   <Link to="/lich-su" className="cursor-pointer">
                     <History className="h-4 w-4 mr-2" />
                     Lịch sử đặt phòng
                   </Link>
                 </DropdownMenuItem>
+
+                <DropdownMenuItem asChild>
+                  <Link to="/ho-tro" className="cursor-pointer">
+                    <HelpCircle className="h-4 w-4 mr-2" />
+                    Gửi hỗ trợ
+                  </Link>
+                </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
+                
                 <DropdownMenuItem
                   onClick={() => {
                     logout();
@@ -149,16 +184,14 @@ export function Footer() {
           <p className="text-sm">Địa chỉ: 2 Ngự Bình, An Cụ, TP. Huế</p>
         </div>
       </div>
-
-      <Separator />
     </footer>
   );
 }
 
-export default function SiteLayout({ children }) {
+export default function SiteLayout({ children, viewMode, setViewMode }) {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <Header />
+      <Header viewMode={viewMode} setViewMode={setViewMode} />
       <main className="flex-1">{children}</main>
       <Footer />
     </div>

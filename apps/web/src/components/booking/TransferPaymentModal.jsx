@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import pb from "@/lib/pocketbaseClient";
-import { fmtVND, applyServiceQuantityDelta, createPayment } from "@/lib/store";
+import { fmtVND } from "@/lib/store";
 import { Loader2, ExternalLink, Copy, Check, QrCode } from "lucide-react";
 import QrImage from "@/components/booking/QrImage";
 import { Button } from "@/components/ui/button";
@@ -22,48 +22,39 @@ export default function TransferPaymentModal({ bookingData, onError }) {
         setLoading(true);
 
         const numericOrderCode = Number(String(Date.now()).slice(-6));
-        const bookingPayload = {
-          ...bookingData,
-          payStatus: "unpaid",
-          status: "pending",
-        };
 
-        if (Array.isArray(bookingData?.serviceItems) && bookingData.serviceItems.length) {
-          await applyServiceQuantityDelta(bookingData.serviceItems);
-        }
-
-        // Tạo booking tạm dạng pending
-        const booking = await pb.collection("bookings").create(bookingPayload);
-        
-        // Tạo payment tạm dạng pending
-        const payment = await createPayment({
-          booking: booking.id,
-          amount: bookingData?.total,
-          method: "transfer",
-          status: "pending",
-          transactionCode: String(numericOrderCode),
-        });
-
-        if (!isMounted) return;
-        setCreatedBooking(booking);
-        setCreatedPayment(payment);
-
-        // Gọi Backend lấy thông tin QR PayOS
-        const res = await pb.send("/api/create-payos-payment", {
+        // Tạo booking + payment qua route backend có transaction
+        // (đã bao gồm kiểm tra trùng phòng/ngày, chống race condition)
+        const res = await pb.send("/api/create-booking", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            bookingId: booking.id,
+            ...bookingData,
+            method: "transfer",
+            transactionCode: String(numericOrderCode),
+          }),
+        });
+
+        if (!isMounted) return;
+        setCreatedBooking(res.booking);
+        setCreatedPayment(res.payment);
+
+        // Gọi Backend lấy thông tin QR PayOS
+        const payRes = await pb.send("/api/create-payos-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bookingId: res.booking.id,
             amount: Number(bookingData?.total || 0),
             orderCode: numericOrderCode,
           }),
         });
 
         if (isMounted) {
-          if (res?.checkoutUrl || res?.qrCode) {
+          if (payRes?.checkoutUrl || payRes?.qrCode) {
             setPayOsData({
-              qrCode: res.qrCode,
-              checkoutUrl: res.checkoutUrl,
+              qrCode: payRes.qrCode,
+              checkoutUrl: payRes.checkoutUrl,
             });
           } else {
             onError("Không tạo được link thanh toán PayOS.");
@@ -71,7 +62,13 @@ export default function TransferPaymentModal({ bookingData, onError }) {
         }
       } catch (err) {
         console.error("Lỗi khởi tạo PayOS:", err);
-        if (isMounted) onError("Lỗi kết nối đến cổng thanh toán PayOS.");
+        if (isMounted) {
+          if (err?.status === 409) {
+            onError(err?.response?.message || "Phòng vừa được người khác đặt trong lúc bạn thao tác.");
+          } else {
+            onError("Lỗi kết nối đến cổng thanh toán PayOS.");
+          }
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -117,7 +114,7 @@ export default function TransferPaymentModal({ bookingData, onError }) {
     return (
       <div className="flex flex-col items-center justify-center p-8 bg-muted/30 rounded-xl border border-dashed my-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
-        <p className="text-sm text-muted-foreground">Đang kết nối PayOS và tạo mã QR...</p>
+        <p className="text-sm text-muted-foreground">Đang tạo mã QR...</p>
       </div>
     );
   }
@@ -126,7 +123,7 @@ export default function TransferPaymentModal({ bookingData, onError }) {
     <div className="p-6 bg-gradient-to-b from-blue-50/50 to-white rounded-xl border border-blue-200 shadow-sm my-4 text-center space-y-4">
       <div className="flex items-center justify-center gap-2 text-primary font-semibold text-lg">
         <QrCode className="w-5 h-5 text-blue-600" />
-        <span>Quét mã QR Chuyển khoản qua Ngân hàng</span>
+        <span>Quét mã QR này để Chuyển khoản</span>
       </div>
 
       <div className="flex flex-col items-center justify-center">
@@ -164,7 +161,7 @@ export default function TransferPaymentModal({ bookingData, onError }) {
       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 flex items-center justify-center gap-2 text-left">
         <Loader2 className="w-4 h-4 animate-spin shrink-0 text-emerald-600" />
         <span>
-          Hệ thống đang chờ giao dịch. Khi bạn chuyển khoản thành công, màn hình sẽ <strong>tự động chuyển sang trang Hoàn tất</strong>.
+          Hệ thống đang chờ giao dịch.<strong>Vui lòng thanh toán trước 1 phút</strong>.
         </span>
       </div>
     </div>
