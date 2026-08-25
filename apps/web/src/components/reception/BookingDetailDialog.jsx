@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import pb from "@/lib/pocketbaseClient";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,16 +16,8 @@ import {
   Minus,
   ShoppingBag,
 } from "lucide-react";
-import { fmtVND, fmtDate, api, applyServiceQuantityDelta ,releaseServiceQuantity} from "@/lib/store";
+import { fmtVND, fmtDate, api, applyServiceQuantityDelta, releaseServiceQuantity } from "@/lib/store";
 
-/**
- * POPUP CHI TIẾT ĐẶT PHÒNG
- *
- * Props:
- * - booking: booking đang chọn xem (null nếu đóng popup)
- * - onClose(): đóng popup
- * - onUpdateStatus(booking, newStatus): cập nhật trạng thái booking
- */
 export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, onBookingUpdated }) {
   const [bookingData, setBookingData] = useState(booking);
   const [services, setServices] = useState([]);
@@ -33,7 +25,6 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
   const [serviceQty, setServiceQty] = useState({});
   const [savingService, setSavingService] = useState(false);
 
-  // MỚI: tổng số tiền đã thanh toán thành công (từ các payment status = completed)
   const [paidAmount, setPaidAmount] = useState(0);
   const [loadingPaid, setLoadingPaid] = useState(false);
 
@@ -45,7 +36,6 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
     api.services().then(setServices).catch(() => setServices([]));
   }, []);
 
-  // MỚI: mỗi khi mở booking khác nhau, load lại số tiền đã thanh toán thực tế
   useEffect(() => {
     if (!bookingData?.id) {
       setPaidAmount(0);
@@ -86,13 +76,7 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
 
   const roomObj = bookingData?.expand?.roomCode;
   const displayRoomCode = roomObj?.code || bookingData?.roomCode || "";
-  const payStatusLabel =
-    bookingData?.payStatus === "paid"
-      ? "Đã thanh toán"
-      : bookingData?.payStatus === "unpaid"
-      ? "Chưa thanh toán"
-      : bookingData?.payStatus || "Chưa thanh toán";
-
+  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const checkInDate = bookingData?.checkIn ? new Date(bookingData.checkIn) : null;
@@ -131,15 +115,15 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
   );
   const previewTotal = roomBaseTotal + serviceTotal;
 
-  // MỚI: tổng tiền hiện tại của booking (đã lưu, không phải preview)
   const currentTotal = Number(bookingData?.total || roomBaseTotal);
-  // MỚI: số tiền còn phải thu = tổng hiện tại - đã thanh toán, không âm
   const amountDue = Math.max(0, currentTotal - paidAmount);
 
-  const isStockTrackedService = (service) => {
-    const val = Number(service?.quantity ?? 0);
-    return Number.isFinite(val) && val > 0;
-  };
+  const payStatusLabel =
+    amountDue === 0 && currentTotal > 0
+      ? "Đã thanh toán"
+      : paidAmount > 0
+      ? "Thanh toán một phần"
+      : "Chưa thanh toán";
 
   const bumpService = (id, delta) => {
     setServiceQty((prev) => ({
@@ -205,17 +189,21 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
         Number(bookingData.roomPrice || 0) * Number(bookingData.nights || 1) +
         nextServicesTotal;
 
-      await pb.collection("bookings").update(bookingData.id, {
+      // Cập nhật trạng thái thanh toán nếu tổng tiền mới lớn hơn số tiền đã thu
+      const nextPayStatus = nextTotal <= paidAmount ? "paid" : "unpaid";
+
+      const updatePayload = {
         servicesDetail: nextServiceDetail,
         servicesTotal: nextServicesTotal,
         total: nextTotal,
-      });
+        payStatus: nextPayStatus,
+      };
+
+      await pb.collection("bookings").update(bookingData.id, updatePayload);
 
       setBookingData((prev) => ({
         ...prev,
-        servicesDetail: nextServiceDetail,
-        servicesTotal: nextServicesTotal,
-        total: nextTotal,
+        ...updatePayload,
       }));
 
       if (typeof onBookingUpdated === "function") {
@@ -224,11 +212,14 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
 
       setShowServicePicker(false);
     } catch (err) {
-      alert("Thêm dịch vụ thất bại: " + (err?.message || "Lỗi không xác định"));
+      alert("Cập nhật dịch vụ thất bại: " + (err?.message || "Lỗi không xác định"));
     } finally {
       setSavingService(false);
     }
   };
+
+  // Kiểm tra xem phòng có thuộc trạng thái cho phép chỉnh sửa dịch vụ không
+  const canManageServices = bookingData && bookingData.status !== "cancelled" && bookingData.status !== "checkedout";
 
   return (
     <Dialog open={!!bookingData} onOpenChange={(open) => !open && onClose()}>
@@ -280,7 +271,6 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
               </b>
             </p>
 
-            {/* MỚI: khối tách bạch đã thu / còn thu, đây là phần lễ tân cần nhìn vào */}
             <div className="mt-2 rounded-lg border bg-slate-50 p-3 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Đã thanh toán</span>
@@ -302,7 +292,8 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
               </p>
             )}
 
-            {bookingData.status === "checkedin" && (
+            {/* CHO PHÉP THÊM/SỬA DỊCH VỤ CẢ KHI CHƯA CHECKIN (MIỄN LÀ CHƯA HỦY/TRẢ PHÒNG) */}
+            {canManageServices && (
               <div className="pt-2">
                 <Button
                   type="button"
@@ -311,13 +302,13 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
                   onClick={() => setShowServicePicker((prev) => !prev)}
                 >
                   <ShoppingBag className="w-4 h-4" />
-                  {showServicePicker ? "Đóng danh sách dịch vụ" : "Thêm dịch vụ"}
+                  {showServicePicker ? "Đóng danh sách dịch vụ" : "Thêm / Sửa dịch vụ"}
                 </Button>
 
                 {showServicePicker && (
                   <div className="mt-3 space-y-3 rounded-lg border bg-slate-50 p-3">
                     {services.map((s) => {
-                      const stockTracked = isStockTrackedService(s);
+                      const qty = Number(serviceQty[s.id] || 0);
 
                       return (
                         <div
@@ -331,45 +322,35 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
                             </p>
                           </div>
 
-                          {stockTracked ? (
-                            <div className="flex items-center gap-2">
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8"
-                                onClick={() => bumpService(s.id, -1)}
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </Button>
-                              <span className="w-7 text-center text-sm font-semibold">
-                                {serviceQty[s.id] || 0}
-                              </span>
-                              <Button
-                                type="button"
-                                size="icon"
-                                variant="outline"
-                                className="h-8 w-8"
-                                onClick={() => bumpService(s.id, 1)}
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          ) : (
+                          <div className="flex items-center gap-2">
                             <Button
                               type="button"
-                              size="sm"
+                              size="icon"
                               variant="outline"
-                              className="h-8 px-3"
+                              className="h-8 w-8 text-slate-600 rounded-full"
+                              onClick={() => bumpService(s.id, -1)}
+                              disabled={qty <= 0}
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </Button>
+
+                            <span className="w-6 text-center text-sm font-semibold">
+                              {qty}
+                            </span>
+
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 text-slate-600 rounded-full"
                               onClick={() => bumpService(s.id, 1)}
                             >
-                              Thêm
+                              <Plus className="w-3.5 h-3.5" />
                             </Button>
-                          )}
+                          </div>
                         </div>
                       );
                     })}
-
                     <div className="rounded-md border bg-white p-2">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>Dịch vụ chọn thêm</span>
@@ -410,22 +391,21 @@ export default function BookingDetailDialog({ booking, onClose, onUpdateStatus, 
                 Nhận phòng
               </Button>
               <Button
-  variant="destructive"
-  onClick={async () => {
-    if (!window.confirm("Xác nhận hủy đơn đặt phòng này?")) return;
-    try {
-      await releaseServiceQuantity(bookingData.servicesDetail || []);
-    } catch (err) {
-      console.warn("Hoàn kho dịch vụ thất bại:", err?.message);
-      // vẫn tiếp tục hủy đơn dù hoàn kho lỗi, tránh kẹt đơn
-    }
-    onUpdateStatus(bookingData, "cancelled");
-  }}
-  className="flex-1 gap-1.5"
->
-  <XCircle className="w-4 h-4" />
-  Hủy đặt
-</Button>
+                variant="destructive"
+                onClick={async () => {
+                  if (!window.confirm("Xác nhận hủy đơn đặt phòng này?")) return;
+                  try {
+                    await releaseServiceQuantity(bookingData.servicesDetail || []);
+                  } catch (err) {
+                    console.warn("Hoàn kho dịch vụ thất bại:", err?.message);
+                  }
+                  onUpdateStatus(bookingData, "cancelled");
+                }}
+                className="flex-1 gap-1.5"
+              >
+                <XCircle className="w-4 h-4" />
+                Hủy đặt
+              </Button>
             </>
           )}
 
