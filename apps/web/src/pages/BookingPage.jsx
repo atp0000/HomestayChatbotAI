@@ -70,7 +70,31 @@ export default function BookingPage() {
   const svcTotal = svcDetail.reduce((a, s) => a + s.amount, 0);
   const total = roomTotal + svcTotal;
 
-  const bump = (id, d) => setQty((q) => ({ ...q, [id]: Math.max(0, (q[id] || 0) + d) }));
+ const bump = (service, delta) => {
+  setQty((prev) => {
+    const currentQty = prev[service.id] || 0;
+    const newQty = currentQty + delta;
+
+    // Không cho giảm xuống dưới 0
+    if (newQty < 0) return prev;
+
+    // Nếu dịch vụ có số lượng tồn kho (quantity > 0 trong DB) 
+    // thì không cho chọn vượt quá tồn kho
+    const stock = Number(service.quantity || 0);
+    if (delta > 0 && stock > 0 && newQty > stock) {
+      alert(`Dịch vụ ${service.name} chỉ còn lại ${stock} ${service.unit}!`);
+      return prev;
+    }
+
+    // Nếu tồn kho bằng 0 VÀ là đồ uống/sản phẩm (không phải dịch vụ kiểu 'lượt')
+    if (delta > 0 && stock === 0 && service.unit !== "lượt") {
+      alert(`${service.name} hiện đã hết hàng!`);
+      return prev;
+    }
+
+    return { ...prev, [service.id]: newQty };
+  });
+};
   const isStockTrackedService = (s) => Number(s?.quantity ?? 0) > 0;
 
   // Kiểm tra thông tin bắt buộc đã nhập đủ chưa
@@ -140,58 +164,75 @@ export default function BookingPage() {
           {/* CỘT TRÁI: DỊCH VỤ & THÔNG TIN */}
           <div className="lg:col-span-2 space-y-6">
             {/* CARD 1: DỊCH VỤ */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-xl flex items-center gap-2 text-primary">
-                  <ConciergeBell className="w-5 h-5" /> Lựa chọn dịch vụ
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {services.map((s) => {
-                  const imageName = Array.isArray(s.image) ? s.image[0] : s.image;
-                  const imageUrl = (s && imageName) ? pb.files.getURL(s, imageName) : null;
-                  const stockTracked = isStockTrackedService(s);
+            {/* CARD 1: DỊCH VỤ */}
+{/* CARD 1: DỊCH VỤ */}
+<Card>
+  <CardHeader>
+    <CardTitle className="text-xl flex items-center gap-2 text-primary">
+      <ConciergeBell className="w-5 h-5" /> Lựa chọn dịch vụ
+    </CardTitle>
+  </CardHeader>
+  <CardContent className="space-y-4">
+    {services.map((s) => {
+      const imageName = Array.isArray(s.image) ? s.image[0] : s.image;
+      const imageUrl = (s && imageName) ? pb.files.getURL(s, imageName) : null;
+      const itemQty = qty[s.id] || 0;
+      const stock = Number(s.quantity || 0);
 
-                  return (
-                    <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg gap-4">
-                      <div className="flex items-center gap-3">
-                        {imageUrl ? (
-                          <img src={imageUrl} alt={s.name} className="w-16 h-16 rounded-md object-cover border" />
-                        ) : (
-                          <div className="w-16 h-16 rounded-md bg-muted border flex items-center justify-center text-xs text-muted-foreground">Không ảnh</div>
-                        )}
-                        <div>
-                          <p className="font-semibold">{s.name}</p>
-                          <p className="text-sm text-muted-foreground">{fmtVND(s.price)} / {s.unit}</p>
-                        </div>
-                      </div>
+      // Kiểm tra xem món này đã hết hàng chưa (chỉ áp dụng cho mặt hàng không phải tính theo 'lượt')
+      const isOutOfStock = stock === 0 && s.unit !== "lượt";
+      // Kiểm tra xem đã đạt giới hạn tồn kho chưa
+      const isMaxReached = stock > 0 && itemQty >= stock;
 
-                      {stockTracked ? (
-                        <div className="flex items-center gap-2">
-                          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => bump(s.id, -1)}>
-                            <Minus className="w-3.5 h-3.5" />
-                          </Button>
-                          <span className="w-8 text-center font-semibold text-sm">{qty[s.id] || 0}</span>
-                          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => bump(s.id, 1)}>
-                            <Plus className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-9 px-3"
-                          onClick={() => bump(s.id, 1)}
-                        >
-                          Thêm
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
+      return (
+        <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg gap-4">
+          <div className="flex items-center gap-3">
+            {imageUrl ? (
+              <img src={imageUrl} alt={s.name} className="w-16 h-16 rounded-md object-cover border" />
+            ) : (
+              <div className="w-16 h-16 rounded-md bg-muted border flex items-center justify-center text-xs text-muted-foreground">
+                Không ảnh
+              </div>
+            )}
+            <div>
+              <p className="font-semibold">{s.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {fmtVND(s.price)} / {s.unit}
+                {/* Hiển thị cảnh báo hết hàng nếu tồn kho = 0 */}
+                {isOutOfStock && <span className="text-red-500 text-xs ml-2 font-medium">(Hết hàng)</span>}
+              </p>
+            </div>
+          </div>
 
+          {/* BỘ NÚT TĂNG GIẢM DÙNG CHUNG */}
+          <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8 rounded-full"
+              disabled={itemQty <= 0}
+              onClick={() => bump(s, -1)}
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </Button>
+
+            <span className="w-8 text-center font-semibold text-sm">{itemQty}</span>
+
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8 rounded-full"
+              disabled={isOutOfStock || isMaxReached} // Khóa nút cộng khi hết hàng hoặc chọn tối đa kho
+              onClick={() => bump(s, 1)}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+      );
+    })}
+  </CardContent>
+</Card>
             {/* CARD 2: THÔNG TIN KHÁCH HÀNG */}
             <Card>
               <CardHeader>

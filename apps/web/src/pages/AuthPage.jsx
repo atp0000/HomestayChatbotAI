@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import SiteLayout from "@/components/layout/SiteLayout";
 import { useAuth } from "@/lib/AuthContext";
 import { Palmtree, ArrowLeft, MailCheck } from "lucide-react";
-
-// Import các component từ shadcn/ui
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function AuthPage() {
   const { login, signup, forgot, resendVerification } = useAuth();
   const nav = useNavigate();
-  const [tab, setTab] = useState("login"); // "login" | "signup" | "forgot" | "resend"
+  const [tab, setTab] = useState("login"); 
   const [f, setF] = useState({ email: "", password: "", fullName: "", phone: "" });
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");

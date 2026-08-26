@@ -9,8 +9,8 @@ import {
   LayoutDashboard, 
   CalendarDays, 
   HelpCircle,
-  LayoutGrid, // Icon hiển thị dạng lưới
-  ListFilter   // Icon hiển thị dạng danh sách
+  LayoutGrid, 
+  ListFilter  
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

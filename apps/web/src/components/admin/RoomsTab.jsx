@@ -12,7 +12,7 @@ export default function RoomsTab({ rooms, types, del, load }) {
   const [editingRoomId, setEditingRoomId] = useState(null);
   const [editingTypeId, setEditingTypeId] = useState(null);
 
-  // Form Loại phòng (Chứa đầy đủ thông tin thương mại/mô tả/ảnh)
+  // Form Loại phòng 
   const [typeForm, setTypeForm] = useState({
     code: "",
     name: "",

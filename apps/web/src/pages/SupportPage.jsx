@@ -306,14 +306,14 @@ export default function SupportPage() {
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-6 py-2 rounded-full text-xs font-bold text-white bg-pink-400 hover:bg-pink-500 transition-colors shadow-xs"
+                    className="px-6 py-2 rounded-lg bg-rose-300 text-rose-900 font-bold text-sm hover:bg-rose-400"
                   >
                     HỦY BỎ
                   </button>
                   <button
                     type="submit"
                     disabled={submitting || !subject.trim() || !message.trim()}
-                    className="px-8 py-2 rounded-full text-xs font-bold text-slate-900 bg-sky-300 hover:bg-sky-400 disabled:opacity-50 transition-colors shadow-xs flex items-center gap-1.5"
+                    className="px-8 py-2 rounded-lg bg-sky-300 text-slate-900 font-bold text-sm hover:bg-sky-400"
                   >
                     {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     LƯU

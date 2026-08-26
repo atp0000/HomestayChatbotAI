@@ -7,8 +7,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
  * @param {number} totalPages Tổng số trang
  * @param {function} onPageChange Hàm chuyển trang
  * @param {number} totalItems Tổng số dòng dữ liệu
- * @param {number} itemsPerPage Số lượng dòng hiển thị / trang (mặc định 5 hoặc 10)
- * @param {string} itemName Tên đơn vị hiển thị (ví dụ: "phòng", "loại phòng", "đơn")
+ * @param {number} itemsPerPage 
+ * @param {string} itemName 
  */
 export default function Pagination({
   currentPage = 1,

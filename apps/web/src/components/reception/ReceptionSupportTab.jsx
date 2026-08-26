@@ -2,9 +2,7 @@ import React, { useState, useEffect } from "react";
 import pb from "@/lib/pocketbaseClient";
 import { Button } from "@/components/ui/button";
 import { X, Send, Bell } from "lucide-react";
-import Pagination from "@/components/layout/Pagination"; // 🟢 Import component Phân trang
-
-const ITEMS_PER_PAGE = 5; // Số lượng yêu cầu hiển thị trên mỗi trang
+import Pagination from "@/components/layout/Pagination"; 
 
 export default function ReceptionSupportTab() {
   const [requests, setRequests] = useState([]);
@@ -12,6 +10,7 @@ export default function ReceptionSupportTab() {
 
   // State Phân trang
   const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // State Modal Trả lời
   const [selectedReq, setSelectedReq] = useState(null);
@@ -57,23 +56,16 @@ export default function ReceptionSupportTab() {
     };
   }, []);
 
-  // Tính toán dữ liệu phân trang
-  const totalItems = requests.length;
-  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const currentRequests = requests.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-  // Đảm bảo không bị out-of-bound trang khi danh sách giảm số lượng
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalItems, totalPages, currentPage]);
-
-  // Báo chấm đỏ tổng số yêu cầu mới chưa xử lý
+  // Tính số lượng yêu cầu mới chưa xử lý
   const pendingCount = requests.filter(
     (req) => !req.reply || req.reply.trim() === "" || req.status !== "resolved"
   ).length;
+
+  // Tính toán dữ liệu cắt theo trang
+  const totalItems = requests.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentRequests = requests.slice(startIndex, startIndex + itemsPerPage);
 
   const handleOpenReply = (req) => {
     setSelectedReq(req);
@@ -112,8 +104,7 @@ export default function ReceptionSupportTab() {
         <h2 className="text-lg font-bold text-teal-800 flex items-center gap-2">
           Quản Lý Yêu Cầu Hỗ Trợ (Lễ Tân)
           {pendingCount > 0 && (
-            <span className="relative flex items-center gap-1 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-xs">
-              <span className="animate-ping absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-red-400 opacity-75"></span>
+            <span className="flex items-center gap-1 bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-xs">
               <Bell className="w-3 h-3" />
               {pendingCount} mới
             </span>
@@ -124,7 +115,7 @@ export default function ReceptionSupportTab() {
       {loading ? (
         <div className="py-10 text-center text-muted-foreground">Đang tải danh sách...</div>
       ) : (
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden flex flex-col">
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
           <table className="w-full text-left text-sm border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
@@ -155,15 +146,7 @@ export default function ReceptionSupportTab() {
                       className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
                     >
                       <td className="p-3 text-xs text-slate-500 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          {!isAnswered && (
-                            <span className="relative flex h-2 w-2 shrink-0">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                            </span>
-                          )}
-                          {new Date(req.created).toLocaleString("vi-VN")}
-                        </div>
+                        {new Date(req.created).toLocaleString("vi-VN")}
                       </td>
                       <td className="p-3 font-semibold text-slate-800">
                         {userInfo?.fullName || "Khách chưa đặt tên"}
@@ -211,13 +194,13 @@ export default function ReceptionSupportTab() {
             </tbody>
           </table>
 
-          {/* 🟢 TÍCH HỢP COMPONENT PHÂN TRANG */}
+          {/* COMPONENT PHÂN TRANG */}
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={(page) => setCurrentPage(page)}
             totalItems={totalItems}
-            itemsPerPage={ITEMS_PER_PAGE}
+            itemsPerPage={itemsPerPage}
             itemName="yêu cầu"
           />
         </div>

@@ -39,8 +39,7 @@ export default function AdminPage() {
     api.rooms().then(setRooms);
     api.roomTypes().then(setTypes);
     api.services().then(setServices);
-
-    // 🟢 SỬA TẠI ĐÂY: Thêm expand "roomCode,customer" cho bookings
+   
     pb.collection("bookings")
       .getFullList({ expand: "roomCode,customer", sort: "-created" })
       .then(setBookings)
@@ -48,7 +47,6 @@ export default function AdminPage() {
         api.bookings().then(setBookings).catch(() => {});
       });
 
-    // Lấy danh sách khách hàng đã xác thực email
     api.customers()
       .then((data) => {
         const verifiedCustomers = (data || []).filter((c) => c.verified === true);

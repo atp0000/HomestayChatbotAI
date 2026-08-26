@@ -50,7 +50,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState({});
 
-  // State Phân trang
+ 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -64,7 +64,7 @@ export default function HistoryPage() {
           expand: "roomCode,roomTypeName",
           sort: "-created",
         }),
-        // Fetch danh sách dịch vụ để tra cứu tên/đơn vị theo ID
+  
         pb.collection("services").getFullList(),
         pb.collection("reviews").getFullList({
           filter: pb.filter("author = {:name}", { name: user.fullName || "" }),
@@ -73,7 +73,6 @@ export default function HistoryPage() {
         .then(([bookingsRes, servicesRes, reviewsRes]) => {
           setList(bookingsRes);
 
-          // Map danh sách dịch vụ theo key id để tra cứu O(1)
           const sMap = {};
           servicesRes.forEach((s) => {
             sMap[s.id] = s;
